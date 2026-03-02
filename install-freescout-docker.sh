@@ -146,7 +146,7 @@ cd "${INSTALL_DIR}"
 
 # ── 4a. Dockerfile ───────────────────────────────────────────────────────────
 cat > Dockerfile <<'DOCKERFILE'
-FROM php:8.1-apache
+FROM php:8.1-apache-bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -155,7 +155,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
         libpng-dev \
         libjpeg62-turbo-dev \
         libfreetype6-dev \
-        libc-client-dev \
+    libc-client2007e-dev \
         libkrb5-dev \
         libxml2-dev \
         libzip-dev \
