@@ -102,7 +102,8 @@ for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
     apt-get remove -y "$pkg" 2>/dev/null || true
 done
 
-apt-get update -y
+apt-get update
+apt-get upgrade -y
 apt-get install -y ca-certificates curl gnupg
 
 # Docker GPG key
@@ -120,7 +121,7 @@ echo \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-apt-get update -y
+apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io \
     docker-buildx-plugin docker-compose-plugin
 
@@ -149,7 +150,7 @@ FROM php:8.1-apache
 ENV DEBIAN_FRONTEND=noninteractive
 
 # OS dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
         libpng-dev \
         libjpeg62-turbo-dev \
         libfreetype6-dev \
