@@ -10,6 +10,7 @@
 ###############################################################################
 
 set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
 
 # ── Colours / helpers ────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -103,7 +104,7 @@ for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
 done
 
 apt-get update
-apt-get upgrade -y
+apt-get upgrade -y -o Dpkg::Options::="--force-confnew"
 apt-get install -y ca-certificates curl gnupg
 
 # Docker GPG key
