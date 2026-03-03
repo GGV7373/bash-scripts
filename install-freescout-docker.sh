@@ -182,8 +182,8 @@ RUN git clone --depth 1 https://github.com/freescout-helpdesk/freescout.git /var
 RUN rm -rf /var/www/html && ln -s /var/www/freescout/public /var/www/html
 
 WORKDIR /var/www/freescout
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts \
-    && composer clear-cache
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
+    && php artisan clear-compiled 2>/dev/null || true
 RUN php artisan package:discover --ansi 2>/dev/null || true
 RUN chown -R www-data:www-data /var/www/freescout
 RUN find /var/www/freescout -type d -exec chmod 755 {} \;
