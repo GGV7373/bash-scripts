@@ -180,9 +180,11 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Clone FreeScout
 RUN git clone --depth 1 https://github.com/freescout-helpdesk/freescout.git /var/www/freescout
-RUN cd /var/www/freescout
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
-RUN composer clear-cache
+RUN rm -rf /var/www/html && ln -s /var/www/freescout/public /var/www/html
+
+WORKDIR /var/www/freescout
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
+    && composer clear-cache
 RUN chown -R www-data:www-data /var/www/freescout
 RUN find /var/www/freescout -type d -exec chmod 755 {} \;
 RUN find /var/www/freescout -type f -exec chmod 644 {} \;
