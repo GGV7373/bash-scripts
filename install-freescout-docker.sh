@@ -169,7 +169,6 @@ RUN docker-php-ext-install -j "$(nproc)" gd
 RUN docker-php-ext-install -j "$(nproc)" mbstring
 RUN docker-php-ext-install -j "$(nproc)" opcache
 RUN docker-php-ext-install -j "$(nproc)" pdo_mysql
-RUN docker-php-ext-install -j "$(nproc)" tokenizer
 RUN docker-php-ext-install -j "$(nproc)" xml
 RUN docker-php-ext-install -j "$(nproc)" zip
 
@@ -319,6 +318,15 @@ docker compose build --no-cache
 
 info "Starting containers …"
 docker compose up -d
+
+info "Checking PHP tokenizer extension …"
+if docker compose exec -T freescout php -m | grep -qi '^tokenizer$'; then
+    info "PHP extension 'tokenizer' is enabled."
+else
+    warn "PHP extension 'tokenizer' is NOT enabled."
+    warn "If FreeScout errors mention tokenizer, add it in Dockerfile and rebuild:"
+    warn "  RUN docker-php-ext-install -j \"\$(nproc)\" tokenizer"
+fi
 
 ###############################################################################
 # 6. Wait for DB & run FreeScout setup
