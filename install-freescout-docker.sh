@@ -151,17 +151,21 @@ FROM php:8.3-apache-bookworm
 ENV DEBIAN_FRONTEND=noninteractive
 
 # OS dependencies
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends libpng-dev libjpeg62-turbo-dev libfreetype6-dev libc-client2007e-dev libkrb5-dev libxml2-dev libzip-dev libonig-dev libcurl4-openssl-dev cron unzip 
-RUN rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
+    libc-client-dev libc-client2007e-dev libkrb5-dev \
+    libxml2-dev libzip-dev libonig-dev libcurl4-openssl-dev \
+    cron unzip git \
+    && rm -rf /var/lib/apt/lists/*
 
 # PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg
-RUN docker-php-ext-configure imap --with-kerberos --with-imap-ssl
+RUN docker-php-ext-configure imap --with-kerberos --with-imap-ssl \
+    && docker-php-ext-install -j "$(nproc)" imap
 RUN docker-php-ext-install -j "$(nproc)" bcmath
 RUN docker-php-ext-install -j "$(nproc)" exif
 RUN docker-php-ext-install -j "$(nproc)" fileinfo
 RUN docker-php-ext-install -j "$(nproc)" gd
-RUN docker-php-ext-install -j "$(nproc)" imap
 RUN docker-php-ext-install -j "$(nproc)" mbstring
 RUN docker-php-ext-install -j "$(nproc)" opcache
 RUN docker-php-ext-install -j "$(nproc)" pdo_mysql
