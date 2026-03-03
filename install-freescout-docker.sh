@@ -335,15 +335,32 @@ fi
 ###############################################################################
 info "Waiting for database to be ready …"
 
-MAX_RETRIES=30
+DB_MAX_RETRIES=90
 RETRY_INTERVAL=5
-for i in $(seq 1 $MAX_RETRIES); do
-    if docker compose exec -T freescout php artisan tinker --execute="DB::connection()->getPdo(); echo 'OK';" 2>/dev/null | grep -q "OK"; then
-        info "Database is ready."
+for i in $(seq 1 $DB_MAX_RETRIES); do
+    DB_HEALTH=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' freescout-db 2>/dev/null || echo "unknown")
+    if [[ "${DB_HEALTH}" == "healthy" ]]; then
+        info "Database container is healthy."
         break
     fi
-    if [[ $i -eq $MAX_RETRIES ]]; then
-        die "Database did not become ready after $((MAX_RETRIES * RETRY_INTERVAL)) seconds."
+    if [[ $i -eq $DB_MAX_RETRIES ]]; then
+        warn "Database health status: ${DB_HEALTH}"
+        docker compose logs --tail=80 db || true
+        die "Database did not become healthy after $((DB_MAX_RETRIES * RETRY_INTERVAL)) seconds."
+    fi
+    echo -n "."
+    sleep $RETRY_INTERVAL
+done
+
+APP_DB_MAX_RETRIES=30
+for i in $(seq 1 $APP_DB_MAX_RETRIES); do
+    if docker compose exec -T freescout php artisan tinker --execute="DB::connection()->getPdo(); echo 'OK';" 2>/dev/null | grep -q "OK"; then
+        info "FreeScout can connect to database."
+        break
+    fi
+    if [[ $i -eq $APP_DB_MAX_RETRIES ]]; then
+        docker compose logs --tail=80 freescout || true
+        die "FreeScout could not connect to database after $((APP_DB_MAX_RETRIES * RETRY_INTERVAL)) seconds."
     fi
     echo -n "."
     sleep $RETRY_INTERVAL
