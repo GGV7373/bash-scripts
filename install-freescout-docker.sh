@@ -152,23 +152,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # OS dependencies
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends libpng-dev libjpeg62-turbo-dev libfreetype6-dev libc-client2007e-dev libkrb5-dev libxml2-dev libzip-dev libonig-dev libcurl4-openssl-dev cron unzip 
-    && rm -rf /var/lib/apt/lists/*
+RUN rm -rf /var/lib/apt/lists/*
 
 # PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-configure imap --with-kerberos --with-imap-ssl \
-    && docker-php-ext-install -j"$(nproc)" \
-        bcmath \
-        exif \
-        fileinfo \
-        gd \
-        imap \
-        mbstring \
-        opcache \
-        pdo_mysql \
-        tokenizer \
-        xml \
-        zip
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg
+RUN docker-php-ext-configure imap --with-kerberos --with-imap-ssl
+RUN docker-php-ext-install -j"$(nproc)" bcmath exif fileinfo gd imap mbstring opcache pdo_mysql tokenizer xml zip
 
 # Apache modules
 RUN a2enmod rewrite headers
@@ -177,10 +166,13 @@ RUN a2enmod rewrite headers
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Clone FreeScout
-RUN git clone https://github.com/freescout-helpdesk/freescout.git /var/www/freescout \
-    && cd /var/www/freescout \
-    && composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
-    && chown -R www-data:www-data /var/www/freescout
+RUN git clone --depth 1 https://github.com/freescout-helpdesk/freescout.git /var/www/freescout
+RUN cd /var/www/freescout
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+RUN composer clear-cache
+RUN chown -R www-data:www-data /var/www/freescout
+RUN find /var/www/freescout -type d -exec chmod 755 {} \;
+RUN find /var/www/freescout -type f -exec chmod 644 {} \;
 
 # Apache vhost
 COPY freescout.conf /etc/apache2/sites-available/000-default.conf
