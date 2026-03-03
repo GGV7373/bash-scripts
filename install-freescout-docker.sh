@@ -183,9 +183,12 @@ RUN git clone --depth 1 https://github.com/freescout-helpdesk/freescout.git /var
 RUN rm -rf /var/www/html && ln -s /var/www/freescout/public /var/www/html
 
 WORKDIR /var/www/freescout
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
-    --no-scripts --ignore-platform-reqs \
-    && composer clear-cache
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs --no-scripts \
+    && composer clear-cache \
+    || { echo "Composer install failed, attempting update..."; \
+         composer update --no-dev --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs --no-scripts \
+         && composer clear-cache; }
+RUN php artisan package:discover --ansi 2>/dev/null || true
 RUN chown -R www-data:www-data /var/www/freescout
 RUN find /var/www/freescout -type d -exec chmod 755 {} \;
 RUN find /var/www/freescout -type f -exec chmod 644 {} \;
