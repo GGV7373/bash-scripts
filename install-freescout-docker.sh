@@ -184,6 +184,7 @@ RUN rm -rf /var/www/html && ln -s /var/www/freescout/public /var/www/html
 
 WORKDIR /var/www/freescout
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
+    --no-scripts --ignore-platform-reqs \
     && composer clear-cache
 RUN chown -R www-data:www-data /var/www/freescout
 RUN find /var/www/freescout -type d -exec chmod 755 {} \;
