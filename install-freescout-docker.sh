@@ -157,7 +157,7 @@ RUN rm -rf /var/lib/apt/lists/*
 # PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg
 RUN docker-php-ext-configure imap --with-kerberos --with-imap-ssl
-RUN docker-php-ext-install -j"$(nproc)" bcmath exif fileinfo gd imap mbstring opcache pdo_mysql tokenizer xml zip
+RUN docker-php-ext-install -j "$(nproc)" bcmath exif fileinfo gd imap mbstring opcache pdo_mysql tokenizer xml zip
 
 # Apache modules
 RUN a2enmod rewrite headers
