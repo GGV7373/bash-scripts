@@ -193,7 +193,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 # PHP extensions & Composer
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j "$(nproc)" \
-       bcmath exif gd mbstring opcache pdo_mysql tokenizer xml zip \
+       bcmath exif gd mbstring opcache pdo_mysql xml zip \
     && curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
 
 # Apache modules
