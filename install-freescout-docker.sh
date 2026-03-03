@@ -193,7 +193,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 # PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg
 RUN docker-php-ext-install -j "$(nproc)" bcmath
-RUN docker-php-ext-install -j "$(nproc)" curl
 RUN docker-php-ext-install -j "$(nproc)" exif
 RUN docker-php-ext-install -j "$(nproc)" gd
 RUN docker-php-ext-install -j "$(nproc)" mbstring
