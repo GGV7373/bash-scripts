@@ -76,15 +76,35 @@ while true; do
     warn "Password must be at least 8 characters."
 done
 
-# Auto-generate DB passwords
-DB_ROOT_PASSWORD=$(openssl rand -hex 16)
-DB_PASSWORD=$(openssl rand -hex 16)
+# Database passwords
+# Reuse existing credentials when re-running installer so persistent DB volumes
+# keep working with the same authentication details.
+DB_ROOT_PASSWORD=""
+DB_PASSWORD=""
+if [[ -f "${INSTALL_DIR}/credentials.txt" ]]; then
+    DB_ROOT_PASSWORD=$(sed -n 's/^DB Root Password:[[:space:]]*//p' "${INSTALL_DIR}/credentials.txt" | head -n1)
+    DB_PASSWORD=$(sed -n 's/^Database Password:[[:space:]]*//p' "${INSTALL_DIR}/credentials.txt" | head -n1)
+    if [[ -n "${DB_ROOT_PASSWORD}" && -n "${DB_PASSWORD}" ]]; then
+        info "Reusing existing database credentials from ${INSTALL_DIR}/credentials.txt"
+    else
+        DB_ROOT_PASSWORD=""
+        DB_PASSWORD=""
+    fi
+fi
+
+if [[ -z "${DB_ROOT_PASSWORD}" || -z "${DB_PASSWORD}" ]]; then
+    DB_ROOT_PASSWORD=$(openssl rand -hex 16)
+    DB_PASSWORD=$(openssl rand -hex 16)
+fi
 
 echo ""
 info "Configuration:"
 info "  Domain/IP     : ${FREESCOUT_DOMAIN}"
 info "  Admin email   : ${ADMIN_EMAIL}"
 info "  Install dir   : ${INSTALL_DIR}"
+echo ""
+read -rp "Fresh install (delete old database)? [Y/n]: " FRESH_INSTALL
+FRESH_INSTALL="${FRESH_INSTALL:-Y}"
 echo ""
 read -rp "Proceed with installation? [Y/n]: " CONFIRM
 CONFIRM="${CONFIRM:-Y}"
@@ -144,6 +164,14 @@ info "Setting up FreeScout under ${INSTALL_DIR} …"
 mkdir -p "${INSTALL_DIR}"
 cd "${INSTALL_DIR}"
 
+# Remove previous stack and volumes if fresh install was chosen
+if [[ "${FRESH_INSTALL}" =~ ^[Yy]$ ]]; then
+    if [[ -f docker-compose.yml ]]; then
+        info "Removing previous FreeScout containers and volumes (old database will be deleted) …"
+        docker compose down -v --remove-orphans 2>/dev/null || true
+    fi
+fi
+
 # ── 4a. Dockerfile ───────────────────────────────────────────────────────────
 cat > Dockerfile <<'DOCKERFILE'
 FROM php:8.3-apache-bookworm
@@ -183,7 +211,7 @@ RUN rm -rf /var/www/html && ln -s /var/www/freescout/public /var/www/html
 
 WORKDIR /var/www/freescout
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
-    && php artisan clear-compiled 2>/dev/null || true
+    && (php artisan clear-compiled 2>/dev/null || true)
 RUN php artisan package:discover --ansi 2>/dev/null || true
 RUN chown -R www-data:www-data /var/www/freescout
 RUN find /var/www/freescout -type d -exec chmod 755 {} \;
@@ -316,7 +344,7 @@ info "All deployment files generated."
 # 5. Build & start containers
 ###############################################################################
 info "Building Docker image (this may take a few minutes) …"
-docker compose build --no-cache
+docker compose build
 
 info "Starting containers …"
 docker compose up -d
