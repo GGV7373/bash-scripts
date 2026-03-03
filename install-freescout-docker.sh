@@ -119,7 +119,7 @@ fi
 info "Installing Docker …"
 
 # Skip Docker installation if already installed
-if command -v docker &> /dev/null && command -v docker-compose &> /dev/null; then
+if command -v docker &> /dev/null && docker compose version &> /dev/null; then
     info "Docker and Docker Compose already installed. Skipping installation."
 else
     # Remove old / conflicting packages
@@ -208,7 +208,9 @@ RUN a2enmod rewrite headers
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Clone FreeScout
-RUN git clone --depth 1 --timeout=60 https://github.com/freescout-helpdesk/freescout.git /var/www/freescout
+RUN git clone --depth 1 \
+    -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
+    https://github.com/freescout-helpdesk/freescout.git /var/www/freescout
 RUN rm -rf /var/www/html && ln -s /var/www/freescout/public /var/www/html
 
 WORKDIR /var/www/freescout
