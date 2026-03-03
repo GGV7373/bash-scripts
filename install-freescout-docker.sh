@@ -118,43 +118,48 @@ fi
 ###############################################################################
 info "Installing Docker …"
 
-# Remove old / conflicting packages
-for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
-    apt-get remove -y "$pkg" 2>/dev/null || true
-done
+# Skip Docker installation if already installed
+if command -v docker &> /dev/null && command -v docker-compose &> /dev/null; then
+    info "Docker and Docker Compose already installed. Skipping installation."
+else
+    # Remove old / conflicting packages
+    for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
+        apt-get remove -y "$pkg" 2>/dev/null || true
+    done
 
-apt-get update
-apt-get upgrade -y -o Dpkg::Options::="--force-confnew"
-apt-get install -y ca-certificates curl gnupg
+    apt-get update
+    apt-get upgrade -y -o Dpkg::Options::="--force-confnew"
+    apt-get install -y ca-certificates curl gnupg
 
-# Docker GPG key
-install -m 0755 -d /etc/apt/keyrings
-if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-        gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
+    # Docker GPG key
+    install -m 0755 -d /etc/apt/keyrings
+    if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+            gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        chmod a+r /etc/apt/keyrings/docker.gpg
+    fi
+
+    # Docker repo
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu \
+      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io \
+        docker-buildx-plugin docker-compose-plugin
+
+    systemctl enable --now docker
+
+    info "Docker installed successfully."
 fi
-
-# Docker repo
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-  tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io \
-    docker-buildx-plugin docker-compose-plugin
-
-systemctl enable --now docker
 
 # Add invoking user to docker group (if run via sudo)
 if [[ -n "${SUDO_USER:-}" ]]; then
     usermod -aG docker "$SUDO_USER" 2>/dev/null || true
     info "Added user '${SUDO_USER}' to docker group (re-login to take effect)."
 fi
-
-info "Docker installed successfully."
 
 ###############################################################################
 # 4. Generate deployment files
@@ -181,16 +186,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 # OS dependencies
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
-    libc-client-dev libc-client2007e-dev libkrb5-dev \
-    libxml2-dev libzip-dev libonig-dev libcurl4-openssl-dev \
-    cron unzip git \
+    libxml2-dev libzip-dev libonig-dev \
+    cron git \
     && rm -rf /var/lib/apt/lists/*
 
 # PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg
-RUN docker-php-ext-configure imap --with-kerberos --with-imap-ssl \
-    && docker-php-ext-install -j "$(nproc)" imap
 RUN docker-php-ext-install -j "$(nproc)" bcmath
+RUN docker-php-ext-install -j "$(nproc)" curl
 RUN docker-php-ext-install -j "$(nproc)" exif
 RUN docker-php-ext-install -j "$(nproc)" gd
 RUN docker-php-ext-install -j "$(nproc)" mbstring
@@ -206,7 +209,7 @@ RUN a2enmod rewrite headers
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Clone FreeScout
-RUN git clone --depth 1 https://github.com/freescout-helpdesk/freescout.git /var/www/freescout
+RUN git clone --depth 1 --timeout=60 https://github.com/freescout-helpdesk/freescout.git /var/www/freescout
 RUN rm -rf /var/www/html && ln -s /var/www/freescout/public /var/www/html
 
 WORKDIR /var/www/freescout
