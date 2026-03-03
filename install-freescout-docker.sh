@@ -190,36 +190,31 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     cron git \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg
-RUN docker-php-ext-install -j "$(nproc)" bcmath
-RUN docker-php-ext-install -j "$(nproc)" exif
-RUN docker-php-ext-install -j "$(nproc)" gd
-RUN docker-php-ext-install -j "$(nproc)" mbstring
-RUN docker-php-ext-install -j "$(nproc)" opcache
-RUN docker-php-ext-install -j "$(nproc)" pdo_mysql
-RUN docker-php-ext-install -j "$(nproc)" xml
-RUN docker-php-ext-install -j "$(nproc)" zip
+# PHP extensions & Composer
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j "$(nproc)" \
+       bcmath exif gd mbstring opcache pdo_mysql tokenizer xml zip \
+    && curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
 
 # Apache modules
 RUN a2enmod rewrite headers
 
-# Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Clone FreeScout
+
+# Clone FreeScout + install dependencies
 RUN git clone --depth 1 \
     -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
     https://github.com/freescout-helpdesk/freescout.git /var/www/freescout
-RUN rm -rf /var/www/html && ln -s /var/www/freescout/public /var/www/html
 
 WORKDIR /var/www/freescout
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
-    && (php artisan clear-compiled 2>/dev/null || true)
-RUN php artisan package:discover --ansi 2>/dev/null || true
-RUN chown -R www-data:www-data /var/www/freescout
-RUN find /var/www/freescout -type d -exec chmod 755 {} \;
-RUN find /var/www/freescout -type f -exec chmod 644 {} \;
+
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
+
+RUN rm -rf /var/www/html && ln -s /var/www/freescout/public /var/www/html && \
+    php artisan package:discover --ansi 2>/dev/null || true && \
+    chown -R www-data:www-data /var/www/freescout && \
+    find /var/www/freescout -type d -exec chmod 755 {} + && \
+    find /var/www/freescout -type f -exec chmod 644 {} +
 
 # Apache vhost
 COPY freescout.conf /etc/apache2/sites-available/000-default.conf
@@ -240,7 +235,6 @@ RUN { \
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-WORKDIR /var/www/freescout
 EXPOSE 80
 
 ENTRYPOINT ["/entrypoint.sh"]
@@ -279,6 +273,7 @@ chmod -R 775 /var/www/freescout/bootstrap/cache
 # Laravel scheduler cron (runs every minute)
 echo "* * * * * www-data cd /var/www/freescout && php artisan schedule:run >> /dev/null 2>&1" \
     > /etc/cron.d/freescout-scheduler
+echo "" >> /etc/cron.d/freescout-scheduler
 chmod 0644 /etc/cron.d/freescout-scheduler
 crontab -u www-data /dev/null 2>/dev/null || true
 
@@ -353,14 +348,7 @@ docker compose build
 info "Starting containers …"
 docker compose up -d
 
-info "Checking PHP tokenizer extension …"
-if docker compose exec -T freescout php -m | grep -qi '^tokenizer$'; then
-    info "PHP extension 'tokenizer' is enabled."
-else
-    warn "PHP extension 'tokenizer' is NOT enabled."
-    warn "If FreeScout errors mention tokenizer, add it in Dockerfile and rebuild:"
-    warn "  RUN docker-php-ext-install -j \"\$(nproc)\" tokenizer"
-fi
+
 
 ###############################################################################
 # 6. Wait for DB & run FreeScout setup
