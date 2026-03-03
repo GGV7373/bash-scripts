@@ -179,7 +179,7 @@ fi
 
 # ── 4a. Dockerfile ───────────────────────────────────────────────────────────
 cat > Dockerfile <<'DOCKERFILE'
-FROM php:8.3-apache-bookworm
+FROM php:8.1-apache-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
