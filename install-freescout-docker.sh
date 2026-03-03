@@ -208,10 +208,10 @@ RUN git clone --depth 1 \
 
 WORKDIR /var/www/freescout
 
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
+RUN COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs --no-scripts
 
 RUN rm -rf /var/www/html && ln -s /var/www/freescout/public /var/www/html && \
-    php artisan package:discover --ansi 2>/dev/null || true && \
+    COMPOSER_ALLOW_SUPERUSER=1 php artisan package:discover --ansi 2>/dev/null || true && \
     chown -R www-data:www-data /var/www/freescout && \
     find /var/www/freescout -type d -exec chmod 755 {} + && \
     find /var/www/freescout -type f -exec chmod 644 {} +
