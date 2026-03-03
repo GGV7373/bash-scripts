@@ -164,7 +164,6 @@ RUN docker-php-ext-configure imap --with-kerberos --with-imap-ssl \
     && docker-php-ext-install -j "$(nproc)" imap
 RUN docker-php-ext-install -j "$(nproc)" bcmath
 RUN docker-php-ext-install -j "$(nproc)" exif
-RUN docker-php-ext-install -j "$(nproc)" fileinfo
 RUN docker-php-ext-install -j "$(nproc)" gd
 RUN docker-php-ext-install -j "$(nproc)" mbstring
 RUN docker-php-ext-install -j "$(nproc)" opcache
@@ -183,11 +182,8 @@ RUN git clone --depth 1 https://github.com/freescout-helpdesk/freescout.git /var
 RUN rm -rf /var/www/html && ln -s /var/www/freescout/public /var/www/html
 
 WORKDIR /var/www/freescout
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs --no-scripts \
-    && composer clear-cache \
-    || { echo "Composer install failed, attempting update..."; \
-         composer update --no-dev --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs --no-scripts \
-         && composer clear-cache; }
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts \
+    && composer clear-cache
 RUN php artisan package:discover --ansi 2>/dev/null || true
 RUN chown -R www-data:www-data /var/www/freescout
 RUN find /var/www/freescout -type d -exec chmod 755 {} \;
