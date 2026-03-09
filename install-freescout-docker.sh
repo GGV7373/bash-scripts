@@ -419,10 +419,9 @@ RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \\
         --ignore-platform-req=php \\
     && composer clear-cache
 
-# Some packages declare classmap paths with casing differences (e.g. controllers vs Controllers).
-# Repair missing classmap paths by symlinking to case-insensitive matches or creating the path.
-RUN php -r 'foreach(glob("vendor/*/*/composer.json")?:[] as \$f){\$c=json_decode(file_get_contents(\$f),true)?:[];\$d=dirname(\$f);foreach(\$c["autoload"]["classmap"]??[] as \$p){\$x=\$d."/".rtrim(\$p,"/");if(file_exists(\$x)){continue;}\$parent=dirname(\$x);\$base=basename(\$x);\$linked=false;if(is_dir(\$parent)){foreach(scandir(\$parent)?:[] as \$entry){if(\$entry==="."||\$entry===".."){continue;}if(strtolower(\$entry)===strtolower(\$base)){if(@symlink(\$entry,\$x)&&file_exists(\$x)){echo "Linked: \$x -> \$entry".PHP_EOL;\$linked=true;}break;}}}if(!\$linked&&!file_exists(\$x)){mkdir(\$x,0755,true);echo "Created: \$x".PHP_EOL;}}}' \\
-    && if [ ! -e vendor/rap2hpoutre/laravel-log-viewer/src/controllers ] && [ -d vendor/rap2hpoutre/laravel-log-viewer/src/Controllers ]; then ln -s Controllers vendor/rap2hpoutre/laravel-log-viewer/src/controllers; fi \\
+# Some packages ship stale/mis-cased classmap paths that break dump-autoload on Linux.
+# Sanitize vendor classmaps: fix case-only mismatches, drop unresolved paths, then dump autoloads.
+RUN php -r 'foreach(glob("vendor/*/*/composer.json")?:[] as \$f){\$raw=file_get_contents(\$f);\$c=json_decode(\$raw,true);if(!is_array(\$c)){continue;}\$paths=\$c["autoload"]["classmap"]??null;if(!is_array(\$paths)){continue;}\$d=dirname(\$f);\$changed=false;\$new=[];foreach(\$paths as \$p){\$p=rtrim((string)\$p,"/");if(\$p===""){continue;}\$x=\$d."/".\$p;if(file_exists(\$x)){\$new[]=\$p;continue;}\$parentAbs=dirname(\$x);\$base=basename(\$x);\$matched=null;if(is_dir(\$parentAbs)){foreach(scandir(\$parentAbs)?:[] as \$entry){if(\$entry==="."||\$entry===".."){continue;}if(strtolower(\$entry)===strtolower(\$base)){\$matched=\$entry;break;}}}if(\$matched!==null){\$fixed=substr(\$p,0,strlen(\$p)-strlen(\$base)).\$matched;\$new[]=\$fixed;\$changed=true;echo "Fixed classmap: \$f :: \$p -> \$fixed".PHP_EOL;continue;}\$changed=true;echo "Removed invalid classmap: \$f :: \$p".PHP_EOL;}if(\$changed){\$c["autoload"]["classmap"]=array_values(array_unique(\$new));file_put_contents(\$f,json_encode(\$c,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES).PHP_EOL);}}' \\
     && COMPOSER_ALLOW_SUPERUSER=1 composer dump-autoload --no-dev
 
 # package:discover may fail at build time (no .env/APP_KEY yet) — re-run at runtime
