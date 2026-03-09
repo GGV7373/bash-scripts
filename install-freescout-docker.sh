@@ -420,11 +420,9 @@ RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \\
     && composer clear-cache
 
 # Some packages declare classmap directories that don't exist after --no-scripts install.
-# Create them so the autoloader dump doesn't fail.
-COPY fix-classmap.php /tmp/fix-classmap.php
-RUN php /tmp/fix-classmap.php \\
-    && rm -f /tmp/fix-classmap.php \\
-    && COMPOSER_ALLOW_SUPERUSER=1 composer dump-autoload --optimize --no-dev
+# Create the known missing dir, then generate the autoloader.
+RUN mkdir -p vendor/rap2hpoutre/laravel-log-viewer/src/controllers \\
+    && COMPOSER_ALLOW_SUPERUSER=1 composer dump-autoload --no-dev
 
 # package:discover may fail at build time (no .env/APP_KEY yet) — re-run at runtime
 RUN COMPOSER_ALLOW_SUPERUSER=1 php artisan package:discover --ansi 2>&1 || true
@@ -522,22 +520,6 @@ echo "Queue worker started (PID: $!)"
 
 exec "$@"
 ENTRYPOINT
-
-# ── 4d-extra. Helper to create missing classmap directories ──────────────────
-cat > fix-classmap.php <<'FIXCLASSMAP'
-<?php
-foreach (glob("vendor/*/*/composer.json") as $f) {
-    $c = json_decode(file_get_contents($f), true) ?: [];
-    $d = dirname($f);
-    foreach ($c["autoload"]["classmap"] ?? [] as $p) {
-        $path = $d . "/" . rtrim($p, "/");
-        if (!file_exists($path)) {
-            @mkdir($path, 0755, true);
-            echo "Created missing classmap dir: $path\n";
-        }
-    }
-}
-FIXCLASSMAP
 
 # ── 4d. .env for FreeScout (Laravel) ─────────────────────────────────────────
 cat > .env.freescout <<EOF
