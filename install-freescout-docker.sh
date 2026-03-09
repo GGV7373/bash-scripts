@@ -416,6 +416,7 @@ WORKDIR /var/www/freescout
 RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \\
     composer install --no-dev --no-interaction \\
         --prefer-dist --optimize-autoloader --no-scripts \\
+        --ignore-platform-req=php \\
     && composer clear-cache
 
 # package:discover may fail at build time (no .env/APP_KEY yet) — re-run at runtime
