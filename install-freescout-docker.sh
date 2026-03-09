@@ -20,12 +20,32 @@ INSTALL_DIR="/opt/freescout"
 PHP_VERSION="8.2"
 FREESCOUT_VERSION="v1.8.155"
 
+# Shared curl options for resilient downloads.
+CURL_COMMON_OPTS=(
+    --fail
+    --show-error
+    --silent
+    --location
+    --connect-timeout 15
+    --max-time 600
+    --retry 5
+    --retry-delay 2
+    --retry-all-errors
+)
+
 # ── Colours / helpers ────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 info()  { echo -e "${GREEN}[INFO]${NC}  $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 err()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 die()   { err "$@"; exit 1; }
+
+# Download a URL to a file with retry/timeout defaults.
+download_file() {
+    local url="$1"
+    local output="$2"
+    curl "${CURL_COMMON_OPTS[@]}" --output "${output}" "${url}"
+}
 
 # Run noisy commands quietly and print a compact timed status line.
 run_quiet() {
@@ -90,8 +110,8 @@ for cmd in curl openssl awk ss; do
 done
 
 # Check internet (HTTP, not ICMP — ping is blocked on many VPS/cloud hosts)
-if ! curl -fsSL --max-time 10 -o /dev/null https://www.google.com 2>/dev/null && \
-   ! curl -fsSL --max-time 10 -o /dev/null https://github.com 2>/dev/null; then
+if ! curl "${CURL_COMMON_OPTS[@]}" --max-time 15 -o /dev/null https://www.google.com 2>/dev/null && \
+    ! curl "${CURL_COMMON_OPTS[@]}" --max-time 15 -o /dev/null https://github.com 2>/dev/null; then
     die "No internet connectivity. Please check your network."
 fi
 
@@ -199,7 +219,7 @@ else
     # Docker GPG key (download .asc directly per current Docker docs)
     install -m 0755 -d /etc/apt/keyrings
     rm -f /etc/apt/keyrings/docker.asc
-    run_quiet "Download Docker GPG key" curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    run_quiet "Download Docker GPG key" download_file https://download.docker.com/linux/ubuntu/gpg /etc/apt/keyrings/docker.asc
     chmod a+r /etc/apt/keyrings/docker.asc
 
     # Docker repository
@@ -284,7 +304,12 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \\
     && docker-php-ext-configure imap --with-kerberos --with-imap-ssl \\
     && docker-php-ext-install -j "\$(nproc)" \\
        bcmath exif gd imap mbstring opcache pdo_mysql xml zip \\
-    && curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
+    && EXPECTED_CHECKSUM="\$(curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://composer.github.io/installer.sig)" \
+    && curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://getcomposer.org/installer -o /tmp/composer-setup.php \
+    && ACTUAL_CHECKSUM="\$(php -r \"echo hash_file('sha384', '/tmp/composer-setup.php');\")" \
+    && [ "\${EXPECTED_CHECKSUM}" = "\${ACTUAL_CHECKSUM}" ] \
+    && php /tmp/composer-setup.php --install-dir=/usr/bin --filename=composer \
+    && rm -f /tmp/composer-setup.php
 
 # Apache modules
 RUN a2enmod rewrite headers
