@@ -304,10 +304,10 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \\
     && docker-php-ext-configure imap --with-kerberos --with-imap-ssl \\
     && docker-php-ext-install -j "\$(nproc)" \\
        bcmath exif gd imap mbstring opcache pdo_mysql xml zip \\
-    && EXPECTED_CHECKSUM="\$(curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://composer.github.io/installer.sig)" \
-    && curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://getcomposer.org/installer -o /tmp/composer-setup.php \
-    && ACTUAL_CHECKSUM="\$(php -r \"echo hash_file('sha384', '/tmp/composer-setup.php');\")" \
-    && [ "\${EXPECTED_CHECKSUM}" = "\${ACTUAL_CHECKSUM}" ] \
+    && EXPECTED_CHECKSUM="\$(curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://composer.github.io/installer.sig)" \\
+    && curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://getcomposer.org/installer -o /tmp/composer-setup.php \\
+    && ACTUAL_CHECKSUM="\$(sha384sum /tmp/composer-setup.php | cut -d ' ' -f 1)" \\
+    && [ "\${EXPECTED_CHECKSUM}" = "\${ACTUAL_CHECKSUM}" ] \\
     && php /tmp/composer-setup.php --install-dir=/usr/bin --filename=composer \
     && rm -f /tmp/composer-setup.php
 
