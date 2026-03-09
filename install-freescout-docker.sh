@@ -53,7 +53,8 @@ CURRENT_PHASE=0
 show_progress() {
     local label="$1"
     local percent filled empty bar_fill bar_empty
-    ((CURRENT_PHASE++))
+    # Pre-increment avoids a non-zero status on the first call under `set -e`.
+    ((++CURRENT_PHASE))
     percent=$(( CURRENT_PHASE * 100 / TOTAL_PHASES ))
     filled=$(( percent / 5 ))
     empty=$(( 20 - filled ))
