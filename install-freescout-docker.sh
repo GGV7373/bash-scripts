@@ -18,7 +18,7 @@ export DEBIAN_FRONTEND=noninteractive
 SCRIPT_VERSION="3.0.0"
 INSTALL_DIR="/opt/freescout"
 PHP_VERSION="8.2"
-FREESCOUT_VERSION="v1.8.155"
+FREESCOUT_VERSION="latest"
 
 # Shared curl options for resilient downloads.
 CURL_COMMON_OPTS=(
@@ -40,11 +40,64 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 err()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 die()   { err "$@"; exit 1; }
 
+TOTAL_PHASES=8
+CURRENT_PHASE=0
+
+show_progress() {
+    local label="$1"
+    local percent filled empty bar_fill bar_empty
+    ((CURRENT_PHASE++))
+    percent=$(( CURRENT_PHASE * 100 / TOTAL_PHASES ))
+    filled=$(( percent / 5 ))
+    empty=$(( 20 - filled ))
+    printf -v bar_fill '%*s' "${filled}" ''
+    printf -v bar_empty '%*s' "${empty}" ''
+    bar_fill=${bar_fill// /#}
+    bar_empty=${bar_empty// /-}
+    info "Progress [${bar_fill}${bar_empty}] ${percent}% (${CURRENT_PHASE}/${TOTAL_PHASES}) - ${label}"
+}
+
 # Download a URL to a file with retry/timeout defaults.
 download_file() {
     local url="$1"
     local output="$2"
     curl "${CURL_COMMON_OPTS[@]}" --output "${output}" "${url}"
+}
+
+resolve_latest_freescout_tag() {
+    local latest_tag
+    latest_tag=$(curl "${CURL_COMMON_OPTS[@]}" \
+        -H "Accept: application/vnd.github+json" \
+        -H "User-Agent: freescout-installer" \
+        "https://api.github.com/repos/freescout-helpdesk/freescout/releases/latest" \
+        | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | head -n1 || true)
+
+    [[ -n "${latest_tag}" ]] || return 1
+    echo "${latest_tag}"
+}
+
+resolve_freescout_version() {
+    local requested="$1"
+    local resolved
+
+    if [[ "${requested}" == "latest" ]]; then
+        resolved=$(resolve_latest_freescout_tag) || return 1
+        echo "${resolved}"
+        return 0
+    fi
+
+    if curl "${CURL_COMMON_OPTS[@]}" -o /dev/null \
+        -H "Accept: application/vnd.github+json" \
+        -H "User-Agent: freescout-installer" \
+        "https://api.github.com/repos/freescout-helpdesk/freescout/git/ref/tags/${requested}"; then
+        echo "${requested}"
+        return 0
+    fi
+
+    warn "Requested FreeScout version '${requested}' not found. Falling back to latest release tag."
+    resolved=$(resolve_latest_freescout_tag) || return 1
+    echo "${resolved}"
 }
 
 # Run noisy commands quietly and print a compact timed status line.
@@ -90,6 +143,7 @@ trap 'err "Script failed at line $LINENO. See output above or ${LOG_FILE} for de
 info "FreeScout Docker Installer v${SCRIPT_VERSION}"
 info "Logging to ${LOG_FILE}"
 info "Running pre-flight checks …"
+show_progress "Pre-flight checks"
 
 # Check Ubuntu 24.04
 if [[ -f /etc/os-release ]]; then
@@ -115,6 +169,10 @@ if ! curl "${CURL_COMMON_OPTS[@]}" --max-time 15 -o /dev/null https://www.google
     die "No internet connectivity. Please check your network."
 fi
 
+FREESCOUT_VERSION=$(resolve_freescout_version "${FREESCOUT_VERSION}") || \
+    die "Could not resolve a valid FreeScout release version from GitHub API."
+info "Using FreeScout version: ${FREESCOUT_VERSION}"
+
 # Check disk space (Docker build needs several GB)
 REQUIRED_SPACE_MB=4000
 AVAILABLE_MB=$(df -BM --output=avail / | tail -1 | tr -d ' M')
@@ -135,6 +193,7 @@ info "Port 80 is available."
 ###############################################################################
 # 2. Interactive prompts
 ###############################################################################
+show_progress "Collecting configuration"
 echo ""
 info "=== FreeScout Docker Installer v${SCRIPT_VERSION} ==="
 echo ""
@@ -202,6 +261,7 @@ fi
 ###############################################################################
 # 3. Install Docker Engine + Compose Plugin
 ###############################################################################
+show_progress "Installing Docker runtime"
 info "Installing Docker …"
 
 # Skip Docker installation if already installed
@@ -259,6 +319,7 @@ fi
 ###############################################################################
 # 4. Generate deployment files
 ###############################################################################
+show_progress "Generating deployment files"
 info "Setting up FreeScout under ${INSTALL_DIR} …"
 
 mkdir -p "${INSTALL_DIR}"
@@ -511,6 +572,7 @@ info "All deployment files generated."
 ###############################################################################
 # 5. Build & start containers
 ###############################################################################
+show_progress "Building and starting containers"
 info "Building Docker image (this may take a few minutes) …"
 run_quiet "Docker image build" docker compose build --progress=plain
 
@@ -520,6 +582,7 @@ run_quiet "Start containers" docker compose up -d
 ###############################################################################
 # 6. Wait for DB & run FreeScout setup
 ###############################################################################
+show_progress "Bootstrapping FreeScout"
 info "Waiting for database to be ready …"
 
 DB_MAX_RETRIES=90
@@ -585,6 +648,7 @@ sleep 5
 ###############################################################################
 # 7. Save credentials & print summary
 ###############################################################################
+show_progress "Saving credentials and summary"
 cat > "${INSTALL_DIR}/credentials.txt" <<EOF
 === FreeScout Credentials ===
 Generated: $(date)
@@ -630,6 +694,7 @@ echo ""
 echo "==========================================================="
 
 # Final health check
+show_progress "Final health check"
 info "Verifying FreeScout is accessible …"
 sleep 5
 HTTP_CODE=$(curl -fsSL -o /dev/null -w "%{http_code}" "http://127.0.0.1" 2>/dev/null || echo "000")
