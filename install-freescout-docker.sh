@@ -420,8 +420,8 @@ RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \\
     && composer clear-cache
 
 # Some packages declare classmap directories that don't exist after --no-scripts install.
-# Create the known missing dir, then generate the autoloader.
-RUN mkdir -p vendor/rap2hpoutre/laravel-log-viewer/src/controllers \\
+# Scan all vendor composer.json files and create any missing classmap directories.
+RUN php -r 'foreach(glob("vendor/*/*/composer.json")?:[] as \$f){\$c=json_decode(file_get_contents(\$f),true)?:[];\$d=dirname(\$f);foreach(\$c["autoload"]["classmap"]??[] as \$p){\$x=\$d."/".rtrim(\$p,"/");if(!file_exists(\$x)){mkdir(\$x,0755,true);echo "Created: \$x".PHP_EOL;}}}' \\
     && COMPOSER_ALLOW_SUPERUSER=1 composer dump-autoload --no-dev
 
 # package:discover may fail at build time (no .env/APP_KEY yet) — re-run at runtime
