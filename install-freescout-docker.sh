@@ -415,12 +415,14 @@ WORKDIR /var/www/freescout
 # Install PHP dependencies (--no-scripts: post-install hooks run at runtime via entrypoint)
 RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \\
     composer install --no-dev --no-interaction \\
-        --prefer-dist --optimize-autoloader --no-scripts \\
+        --prefer-dist --no-scripts \\
         --ignore-platform-req=php \\
     && composer clear-cache
 
 # package:discover may fail at build time (no .env/APP_KEY yet) — re-run at runtime
-RUN COMPOSER_ALLOW_SUPERUSER=1 php artisan package:discover --ansi 2>&1 || true
+# Optimize autoloader after discover so all classmap directories exist
+RUN COMPOSER_ALLOW_SUPERUSER=1 php artisan package:discover --ansi 2>&1 || true \\
+    && COMPOSER_ALLOW_SUPERUSER=1 composer dump-autoload --optimize --no-dev 2>&1 || true
 
 # Set ownership and permissions (single-pass, no slow find -exec)
 RUN chown -R www-data:www-data /var/www/freescout \\
