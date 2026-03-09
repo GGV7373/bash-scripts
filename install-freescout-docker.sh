@@ -12,6 +12,13 @@
 #            If edited on Windows, run:  sed -i 's/\r$//' install-freescout-docker.sh
 ###############################################################################
 
+# Guard against accidental execution with sh/dash.
+if [[ -z "${BASH_VERSION:-}" ]]; then
+    echo "ERROR: This installer must be run with bash." >&2
+    echo "Use: sudo bash install-freescout-docker.sh" >&2
+    exit 1
+fi
+
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
@@ -134,6 +141,20 @@ fi
 
 [[ $EUID -eq 0 ]] || die "This script must be run as root (use sudo)."
 
+# Install base prerequisites if they are missing on minimal Ubuntu images.
+MISSING_APT_PACKAGES=()
+command -v curl >/dev/null 2>&1 || MISSING_APT_PACKAGES+=(curl)
+command -v openssl >/dev/null 2>&1 || MISSING_APT_PACKAGES+=(openssl)
+command -v awk >/dev/null 2>&1 || MISSING_APT_PACKAGES+=(gawk)
+command -v ss >/dev/null 2>&1 || MISSING_APT_PACKAGES+=(iproute2)
+command -v timeout >/dev/null 2>&1 || MISSING_APT_PACKAGES+=(coreutils)
+
+if (( ${#MISSING_APT_PACKAGES[@]} > 0 )); then
+    warn "Installing missing prerequisites: ${MISSING_APT_PACKAGES[*]}"
+    apt-get update >/dev/null
+    apt-get install -y ca-certificates "${MISSING_APT_PACKAGES[@]}" >/dev/null
+fi
+
 # ── Logging (requires root for /var/log) ─────────────────────────────────────
 LOG_FILE="/var/log/freescout-install-$(date +%Y%m%d-%H%M%S).log"
 exec > >(tee -a "$LOG_FILE") 2>&1
@@ -159,7 +180,7 @@ else
 fi
 
 # Check required tools
-for cmd in curl openssl awk ss; do
+for cmd in curl openssl awk ss timeout; do
     command -v "$cmd" &>/dev/null || die "Required command '${cmd}' not found. Install it first."
 done
 
