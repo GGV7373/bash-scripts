@@ -421,7 +421,8 @@ RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \\
 
 # Some packages declare classmap paths with casing differences (e.g. controllers vs Controllers).
 # Repair missing classmap paths by symlinking to case-insensitive matches or creating the path.
-RUN php -r 'foreach(glob("vendor/*/*/composer.json")?:[] as \$f){\$c=json_decode(file_get_contents(\$f),true)?:[];\$d=dirname(\$f);foreach(\$c["autoload"]["classmap"]??[] as \$p){\$x=\$d."/".rtrim(\$p,"/");if(file_exists(\$x)){continue;}\$parent=dirname(\$x);\$base=basename(\$x);\$linked=false;if(is_dir(\$parent)){foreach(scandir(\$parent)?:[] as \$entry){if(\$entry==="."||\$entry===".."){continue;}if(strtolower(\$entry)===strtolower(\$base)){\$target=\$parent."/".\$entry;if(@symlink(\$target,\$x)){echo "Linked: \$x -> \$target".PHP_EOL;\$linked=true;}break;}}}if(!\$linked&&!file_exists(\$x)){mkdir(\$x,0755,true);echo "Created: \$x".PHP_EOL;}}}' \\
+RUN php -r 'foreach(glob("vendor/*/*/composer.json")?:[] as \$f){\$c=json_decode(file_get_contents(\$f),true)?:[];\$d=dirname(\$f);foreach(\$c["autoload"]["classmap"]??[] as \$p){\$x=\$d."/".rtrim(\$p,"/");if(file_exists(\$x)){continue;}\$parent=dirname(\$x);\$base=basename(\$x);\$linked=false;if(is_dir(\$parent)){foreach(scandir(\$parent)?:[] as \$entry){if(\$entry==="."||\$entry===".."){continue;}if(strtolower(\$entry)===strtolower(\$base)){if(@symlink(\$entry,\$x)&&file_exists(\$x)){echo "Linked: \$x -> \$entry".PHP_EOL;\$linked=true;}break;}}}if(!\$linked&&!file_exists(\$x)){mkdir(\$x,0755,true);echo "Created: \$x".PHP_EOL;}}}' \\
+    && if [ ! -e vendor/rap2hpoutre/laravel-log-viewer/src/controllers ] && [ -d vendor/rap2hpoutre/laravel-log-viewer/src/Controllers ]; then ln -s Controllers vendor/rap2hpoutre/laravel-log-viewer/src/controllers; fi \\
     && COMPOSER_ALLOW_SUPERUSER=1 composer dump-autoload --no-dev
 
 # package:discover may fail at build time (no .env/APP_KEY yet) — re-run at runtime
