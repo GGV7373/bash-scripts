@@ -412,17 +412,22 @@ RUN for attempt in 1 2 3; do \\
 
 WORKDIR /var/www/freescout
 
-# Install PHP dependencies (--no-scripts: post-install hooks run at runtime via entrypoint)
+# Install PHP dependencies (--no-scripts/--no-autoloader: deferred until after package:discover)
 RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \\
     composer install --no-dev --no-interaction \\
-        --prefer-dist --no-scripts \\
+        --prefer-dist --no-scripts --no-autoloader \\
         --ignore-platform-req=php \\
     && composer clear-cache
 
+# Some packages declare classmap directories that don't exist after --no-scripts install.
+# Create them so the autoloader dump doesn't fail.
+COPY fix-classmap.php /tmp/fix-classmap.php
+RUN php /tmp/fix-classmap.php \\
+    && rm -f /tmp/fix-classmap.php \\
+    && COMPOSER_ALLOW_SUPERUSER=1 composer dump-autoload --optimize --no-dev
+
 # package:discover may fail at build time (no .env/APP_KEY yet) — re-run at runtime
-# Optimize autoloader after discover so all classmap directories exist
-RUN COMPOSER_ALLOW_SUPERUSER=1 php artisan package:discover --ansi 2>&1 || true \\
-    && COMPOSER_ALLOW_SUPERUSER=1 composer dump-autoload --optimize --no-dev 2>&1 || true
+RUN COMPOSER_ALLOW_SUPERUSER=1 php artisan package:discover --ansi 2>&1 || true
 
 # Set ownership and permissions (single-pass, no slow find -exec)
 RUN chown -R www-data:www-data /var/www/freescout \\
@@ -483,9 +488,10 @@ chown -R www-data:www-data /var/www/freescout/bootstrap/cache
 chmod -R 775 /var/www/freescout/bootstrap/cache
 
 # Wait for database connectivity before starting background services
+DB_PASSWORD=$(grep '^DB_PASSWORD=' /var/www/freescout/.env | cut -d= -f2)
 echo "Waiting for database connection..."
 for i in $(seq 1 60); do
-    if php -r "new PDO('mysql:host=db;port=3306;dbname=freescout', 'freescout', getenv('DB_PASSWORD'));" 2>/dev/null; then
+    if php -r "new PDO('mysql:host=db;port=3306;dbname=freescout', 'freescout', '$DB_PASSWORD');" 2>/dev/null; then
         echo "Database connection established."
         break
     fi
@@ -516,6 +522,22 @@ echo "Queue worker started (PID: $!)"
 
 exec "$@"
 ENTRYPOINT
+
+# ── 4d-extra. Helper to create missing classmap directories ──────────────────
+cat > fix-classmap.php <<'FIXCLASSMAP'
+<?php
+foreach (glob("vendor/*/*/composer.json") as $f) {
+    $c = json_decode(file_get_contents($f), true) ?: [];
+    $d = dirname($f);
+    foreach ($c["autoload"]["classmap"] ?? [] as $p) {
+        $path = $d . "/" . rtrim($p, "/");
+        if (!file_exists($path)) {
+            @mkdir($path, 0755, true);
+            echo "Created missing classmap dir: $path\n";
+        }
+    }
+}
+FIXCLASSMAP
 
 # ── 4d. .env for FreeScout (Laravel) ─────────────────────────────────────────
 cat > .env.freescout <<EOF
