@@ -27,6 +27,25 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 err()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 die()   { err "$@"; exit 1; }
 
+# Run noisy commands quietly and print a compact timed status line.
+run_quiet() {
+    local step="$1"
+    shift
+    local started_at elapsed
+    started_at=$(date +%s)
+    info "${step} ..."
+
+    if "$@" >>"${LOG_FILE}" 2>&1; then
+        elapsed=$(( $(date +%s) - started_at ))
+        info "DONE: ${step} (${elapsed} sec)"
+    else
+        elapsed=$(( $(date +%s) - started_at ))
+        err "FAILED: ${step} (${elapsed} sec). See ${LOG_FILE}"
+        tail -n 40 "${LOG_FILE}" >&2 || true
+        exit 1
+    fi
+}
+
 ###############################################################################
 # 1. Pre-flight checks
 ###############################################################################
@@ -174,13 +193,13 @@ else
         timeout 30 apt-get remove -y "$pkg" 2>/dev/null || true
     done
 
-    apt-get update
-    apt-get install -y ca-certificates curl
+    run_quiet "APT update (Docker prerequisites)" apt-get update
+    run_quiet "Install Docker prerequisites" apt-get install -y ca-certificates curl
 
     # Docker GPG key (download .asc directly per current Docker docs)
     install -m 0755 -d /etc/apt/keyrings
     rm -f /etc/apt/keyrings/docker.asc
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    run_quiet "Download Docker GPG key" curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
     chmod a+r /etc/apt/keyrings/docker.asc
 
     # Docker repository
@@ -192,17 +211,16 @@ else
         die "Failed to create Docker APT repository file."
     fi
 
-    apt-get update
+    run_quiet "APT update (Docker repository)" apt-get update
 
     # Verify docker-ce package is available before installing
     if ! apt-cache show docker-ce &>/dev/null; then
         die "docker-ce package not found. Docker APT repository may not be configured correctly."
     fi
 
-    apt-get install -y docker-ce docker-ce-cli containerd.io \
-        docker-buildx-plugin docker-compose-plugin
+    run_quiet "Install Docker Engine and Compose" apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-    systemctl enable --now docker
+    run_quiet "Enable and start Docker service" systemctl enable --now docker
 
     # Verify Docker daemon is actually running
     if ! docker info &>/dev/null; then
@@ -242,7 +260,7 @@ if [[ "${FRESH_INSTALL}" =~ ^[Yy]$ ]]; then
             fi
         fi
         info "Removing previous FreeScout containers and volumes (old database will be deleted) …"
-        docker compose down -v --remove-orphans 2>/dev/null || true
+        docker compose down -v --remove-orphans >/dev/null 2>&1 || true
     fi
 fi
 
@@ -469,10 +487,10 @@ info "All deployment files generated."
 # 5. Build & start containers
 ###############################################################################
 info "Building Docker image (this may take a few minutes) …"
-docker compose build --progress=plain
+run_quiet "Docker image build" docker compose build --progress=plain
 
 info "Starting containers …"
-docker compose up -d
+run_quiet "Start containers" docker compose up -d
 
 ###############################################################################
 # 6. Wait for DB & run FreeScout setup
@@ -492,7 +510,6 @@ for i in $(seq 1 $DB_MAX_RETRIES); do
         docker compose logs --tail=80 db || true
         die "Database did not become healthy after $((DB_MAX_RETRIES * RETRY_INTERVAL)) seconds."
     fi
-    echo -n "."
     sleep $RETRY_INTERVAL
 done
 
@@ -508,12 +525,10 @@ for i in $(seq 1 $APP_DB_MAX_RETRIES); do
         docker compose logs --tail=80 db || true
         die "Database user/schema not ready after $((APP_DB_MAX_RETRIES * RETRY_INTERVAL)) seconds."
     fi
-    echo -n "."
     sleep $RETRY_INTERVAL
 done
 
-info "Generating application key …"
-docker compose exec -T freescout php artisan key:generate --force
+run_quiet "Generate application key" docker compose exec -T freescout php artisan key:generate --force
 
 # Verify APP_KEY was written to .env file
 APP_KEY_CHECK=$(grep -c "^APP_KEY=base64:" "${INSTALL_DIR}/.env.freescout" 2>/dev/null || echo "0")
@@ -522,8 +537,7 @@ if [[ "${APP_KEY_CHECK}" -eq 0 ]]; then
 fi
 info "Application key generated and verified."
 
-info "Running database migrations …"
-docker compose exec -T freescout php artisan migrate --force
+run_quiet "Run database migrations" docker compose exec -T freescout php artisan migrate --force
 
 info "Creating admin user …"
 docker compose exec -T freescout php artisan freescout:create-user \
@@ -536,13 +550,11 @@ docker compose exec -T freescout php artisan freescout:create-user \
     warn "You can create one manually at: http://${FREESCOUT_DOMAIN}/install"
 }
 
-info "Clearing caches …"
-docker compose exec -T freescout php artisan config:clear
-docker compose exec -T freescout php artisan view:clear
-docker compose exec -T freescout php artisan route:clear
+run_quiet "Clear config cache" docker compose exec -T freescout php artisan config:clear
+run_quiet "Clear view cache" docker compose exec -T freescout php artisan view:clear
+run_quiet "Clear route cache" docker compose exec -T freescout php artisan route:clear
 
-info "Restarting FreeScout container to apply configuration …"
-docker compose restart freescout
+run_quiet "Restart FreeScout container" docker compose restart freescout
 sleep 5
 
 ###############################################################################
