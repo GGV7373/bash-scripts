@@ -25,7 +25,7 @@ backup_existing_db() {
 }
 
 generate_dockerfile() {
-    cat > Dockerfile <<'DOCKERFILE'
+    cat > Dockerfile <<DOCKERFILE
 FROM php:${PHP_VERSION}-apache-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
