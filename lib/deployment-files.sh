@@ -31,24 +31,24 @@ FROM php:${PHP_VERSION}-apache-bookworm
 ENV DEBIAN_FRONTEND=noninteractive
 
 # OS dependencies (including unzip for Composer, imap libs for email)
-RUN apt-get update && apt-get install -y --no-install-recommends \\
-    libpng-dev libjpeg62-turbo-dev libfreetype6-dev \\
-    libxml2-dev libzip-dev libonig-dev \\
-    libcurl4-openssl-dev \\
-    libc-client-dev libkrb5-dev \\
-    cron git unzip \\
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
+    libxml2-dev libzip-dev libonig-dev \
+    libcurl4-openssl-dev \
+    libc-client-dev libkrb5-dev \
+    cron git unzip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # PHP extensions (including imap for email fetching) & Composer
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \\
-    && docker-php-ext-configure imap --with-kerberos --with-imap-ssl \\
-    && docker-php-ext-install -j "$(nproc)" \\
-       bcmath exif gd imap mbstring opcache pdo_mysql xml zip \\
-    && EXPECTED_CHECKSUM="$(curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://composer.github.io/installer.sig)" \\
-    && curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://getcomposer.org/installer -o /tmp/composer-setup.php \\
-    && ACTUAL_CHECKSUM="$(sha384sum /tmp/composer-setup.php | cut -d ' ' -f 1)" \\
-    && [ "${EXPECTED_CHECKSUM}" = "${ACTUAL_CHECKSUM}" ] \\
-    && php /tmp/composer-setup.php --install-dir=/usr/bin --filename=composer \\
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-configure imap --with-kerberos --with-imap-ssl \
+    && docker-php-ext-install -j "$(nproc)" \
+       bcmath exif gd imap mbstring opcache pdo_mysql xml zip \
+    && EXPECTED_CHECKSUM="$(curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://composer.github.io/installer.sig)" \
+    && curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://getcomposer.org/installer -o /tmp/composer-setup.php \
+    && ACTUAL_CHECKSUM="$(sha384sum /tmp/composer-setup.php | cut -d ' ' -f 1)" \
+    && [ "${EXPECTED_CHECKSUM}" = "${ACTUAL_CHECKSUM}" ] \
+    && php /tmp/composer-setup.php --install-dir=/usr/bin --filename=composer \
     && rm -f /tmp/composer-setup.php
 
 # Apache modules
@@ -56,49 +56,49 @@ RUN a2enmod rewrite headers
 
 # Clone FreeScout (pinned version, with retry logic)
 ARG FREESCOUT_VERSION=${FREESCOUT_VERSION}
-RUN for attempt in 1 2 3; do \\
-        git clone --depth 1 --branch "${FREESCOUT_VERSION}" \\
-            -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \\
-            https://github.com/freescout-helpdesk/freescout.git /var/www/freescout \\
-        && break || { \\
-            echo "Git clone attempt \${attempt} failed, retrying in 10s..."; \\
-            rm -rf /var/www/freescout; \\
-            sleep 10; \\
-        }; \\
+RUN for attempt in 1 2 3; do \
+        git clone --depth 1 --branch "${FREESCOUT_VERSION}" \
+            -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
+            https://github.com/freescout-helpdesk/freescout.git /var/www/freescout \
+        && break || { \
+            echo "Git clone attempt \${attempt} failed, retrying in 10s..."; \
+            rm -rf /var/www/freescout; \
+            sleep 10; \
+        }; \
     done && [ -d /var/www/freescout ]
 
 WORKDIR /var/www/freescout
 
 # Install PHP dependencies
-RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \\
-    composer install --no-dev --no-interaction \\
-        --prefer-dist --no-scripts --no-autoloader \\
-        --ignore-platform-req=php \\
+RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \
+    composer install --no-dev --no-interaction \
+        --prefer-dist --no-scripts --no-autoloader \
+        --ignore-platform-req=php \
     && composer clear-cache
 
 # Sanitize vendor classmaps: Fix case-only mismatch paths and remove invalid paths
-RUN php -r 'foreach(glob("vendor/*/*/composer.json")?:[] as \$f){\$raw=file_get_contents(\$f);\$c=json_decode(\$raw,true);if(!is_array(\$c)){continue;}\$paths=\$c["autoload"]["classmap"]??null;if(!is_array(\$paths)){continue;}\$d=dirname(\$f);\$changed=false;\$new=[];foreach(\$paths as \$p){\$p=rtrim((string)\$p,"/");if(\$p===""){continue;}\$x=\$d."/".\$p;if(file_exists(\$x)){\$new[]=\$p;continue;}\$parentAbs=dirname(\$x);\$base=basename(\$x);\$matched=null;if(is_dir(\$parentAbs)){foreach(scandir(\$parentAbs)?:[] as \$entry){if(\$entry==="."||\$entry===".."){continue;}if(strtolower(\$entry)===strtolower(\$base)){\$matched=\$entry;break;}}}if(\$matched!==null){\$fixed=substr(\$p,0,strlen(\$p)-strlen(\$base)).\$matched;\$new[]=\$fixed;\$changed=true;echo "Fixed classmap: \$f :: \$p -> \$fixed".PHP_EOL;continue;}\$changed=true;echo "Removed invalid classmap: \$f :: \$p".PHP_EOL;}if(\$changed){\$c["autoload"]["classmap"]=array_values(array_unique(\$new));file_put_contents(\$f,json_encode(\$c,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES).PHP_EOL);}}' \\
+RUN php -r 'foreach(glob("vendor/*/*/composer.json")?:[] as \$f){\$raw=file_get_contents(\$f);\$c=json_decode(\$raw,true);if(!is_array(\$c)){continue;}\$paths=\$c["autoload"]["classmap"]??null;if(!is_array(\$paths)){continue;}\$d=dirname(\$f);\$changed=false;\$new=[];foreach(\$paths as \$p){\$p=rtrim((string)\$p,"/");if(\$p===""){continue;}\$x=\$d."/".\$p;if(file_exists(\$x)){\$new[]=\$p;continue;}\$parentAbs=dirname(\$x);\$base=basename(\$x);\$matched=null;if(is_dir(\$parentAbs)){foreach(scandir(\$parentAbs)?:[] as \$entry){if(\$entry==="."||\$entry===".."){continue;}if(strtolower(\$entry)===strtolower(\$base)){\$matched=\$entry;break;}}}if(\$matched!==null){\$fixed=substr(\$p,0,strlen(\$p)-strlen(\$base)).\$matched;\$new[]=\$fixed;\$changed=true;echo "Fixed classmap: \$f :: \$p -> \$fixed".PHP_EOL;continue;}\$changed=true;echo "Removed invalid classmap: \$f :: \$p".PHP_EOL;}if(\$changed){\$c["autoload"]["classmap"]=array_values(array_unique(\$new));file_put_contents(\$f,json_encode(\$c,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES).PHP_EOL);}}' \
     && COMPOSER_ALLOW_SUPERUSER=1 composer dump-autoload --no-dev
 
 RUN COMPOSER_ALLOW_SUPERUSER=1 php artisan package:discover --ansi 2>&1 || true
 
 # Set ownership and permissions
-RUN chown -R www-data:www-data /var/www/freescout \\
+RUN chown -R www-data:www-data /var/www/freescout \
     && chmod -R u=rwX,g=rX,o=rX /var/www/freescout
 
 # Apache vhost
 COPY freescout.conf /etc/apache2/sites-available/000-default.conf
 
 # PHP production settings
-RUN { \\
-    echo 'opcache.enable=1'; \\
-    echo 'opcache.memory_consumption=256'; \\
-    echo 'opcache.max_accelerated_files=20000'; \\
-    echo 'opcache.validate_timestamps=0'; \\
-    echo 'upload_max_filesize=20M'; \\
-    echo 'post_max_size=25M'; \\
-    echo 'memory_limit=256M'; \\
-    echo 'max_execution_time=120'; \\
+RUN { \
+    echo 'opcache.enable=1'; \
+    echo 'opcache.memory_consumption=256'; \
+    echo 'opcache.max_accelerated_files=20000'; \
+    echo 'opcache.validate_timestamps=0'; \
+    echo 'upload_max_filesize=20M'; \
+    echo 'post_max_size=25M'; \
+    echo 'memory_limit=256M'; \
+    echo 'max_execution_time=120'; \
 } > /usr/local/etc/php/conf.d/freescout.ini
 
 # Entrypoint
