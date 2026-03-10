@@ -1,397 +1,224 @@
 # FreeScout Docker Installer
 
-A modular bash script that automates the installation and deployment of FreeScout (a free open-source help desk and shared mailbox) on Ubuntu 24.04 Server using Docker containers.
+Automated deployment of [FreeScout](https://github.com/freescout-helpdesk/freescout) (open-source help desk) on **Ubuntu 24.04 Server** using Docker.
 
-## Overview
-
-This installer sets up a complete FreeScout deployment with:
-- PHP 8.2 + Apache web server (in Docker)
-- MariaDB 10.11 database (in Docker)
-- Automated configuration and initialization
-- Database backups (on fresh installs)
+Sets up:
+- PHP 8.2 + Apache (Docker container)
+- MariaDB 10.11 (Docker container)
 - Laravel queue worker for email processing
-- Cron scheduler for laravel:schedule
+- Cron scheduler for `artisan schedule:run`
 
-The original monolithic 746-line script has been refactored into 5 focused modules for better maintainability and reusability.
+## Requirements
 
-## System Requirements
-
-- Ubuntu 24.04 Server (other versions may work but are not officially supported)
-- Minimum 2GB RAM, 4GB free disk space (for Docker image build)
-- Internet connectivity (required for downloading dependencies)
-- Root access via sudo
-- Ports 80 available (or modify docker-compose.yml for different port)
-
-## Prerequisites
-
-The installer automatically checks for and installs these if missing:
-- curl
-- openssl
-- awk
-- ss (from iproute2)
-- timeout (from coreutils)
-
-If any are missing, the script will attempt to install them via apt-get. You may be asked for your sudo password.
+- Ubuntu 24.04 Server
+- 2 GB RAM, 4 GB free disk space
+- Internet access
+- Root / sudo
+- Port 80 available
 
 ## Quick Start
 
-1. Download or clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/bash-scripts.git
-   cd bash-scripts
-   ```
+```bash
+git clone https://github.com/yourusername/bash-scripts.git
+cd bash-scripts
+sudo bash install-freescout-docker.sh
+```
 
-2. Make the main script executable:
-   ```bash
-   chmod +x install-freescout-docker.sh
-   ```
+The installer will prompt you for:
+- Domain or server IP
+- Admin email and password (min 8 characters)
+- Fresh install vs. keep existing database
 
-3. Run the installer with sudo:
-   ```bash
-   sudo bash install-freescout-docker.sh
-   ```
-
-4. Follow the interactive prompts:
-   - Enter your domain or server IP
-   - Provide admin email address
-   - Create a strong admin password (minimum 8 characters)
-   - Confirm fresh install or keep existing database
-   - Review configuration and proceed
-
-5. Wait for installation to complete (5-15 minutes depending on internet speed)
-
-6. Access FreeScout at the domain/IP you provided
-
-## Installation Steps Explained
-
-The installer performs these steps automatically:
-
-### 1. Pre-flight Checks (lib/config.sh)
-- Verifies running as root
-- Detects CRLF line endings
-- Checks OS is Ubuntu 24.04
-- Verifies internet connectivity
-- Checks available disk space (4GB minimum)
-- Checks port 80 is available
-- Resolves FreeScout version from GitHub
-
-### 2. Interactive Configuration (lib/config.sh)
-- Prompts for domain/IP
-- Prompts for admin email and password
-- Generates secure database passwords
-- Confirms fresh install or existing database preservation
-
-### 3. Docker Installation (lib/docker-setup.sh)
-- Removes old conflicting Docker packages
-- Adds Docker GPG key
-- Configures Docker APT repository
-- Installs Docker Engine, CLI, and Compose plugin
-- Starts Docker service
-- Adds sudo user to docker group
-
-### 4. Deployment File Generation (lib/deployment-files.sh)
-- Backs up existing database (if applicable)
-- Generates Dockerfile with PHP extensions and FreeScout dependencies
-- Creates Apache VirtualHost configuration
-- Creates container entrypoint script with cron and queue worker
-- Creates .env file for Laravel configuration
-- Creates docker-compose.yml for multi-container orchestration
-
-### 5. Build and Bootstrap (lib/bootstrap.sh)
-- Builds Docker image (first run takes several minutes)
-- Starts containers (freescout-app and freescout-db)
-- Waits for database to become healthy
-- Generates Laravel application key
-- Runs database migrations
-- Creates admin user
-- Clears configuration and view caches
-- Restarts application
-- Performs final HTTP health check
-
-### 6. Summary (lib/bootstrap.sh)
-- Saves credentials to /opt/freescout/credentials.txt
-- Displays installation summary with access URL
-- Lists useful docker compose commands
+Installation takes 5-15 minutes depending on network speed.
 
 ## File Locations
 
-After installation, files are located at:
+| Path | Description |
+|------|-------------|
+| `/opt/freescout/` | Installation directory |
+| `/opt/freescout/docker-compose.yml` | Container orchestration |
+| `/opt/freescout/Dockerfile` | Application image |
+| `/opt/freescout/.env.freescout` | Laravel configuration |
+| `/opt/freescout/credentials.txt` | Saved credentials (mode 600) |
+| `/var/log/freescout-install-*.log` | Installation log |
 
-- Installation Directory: /opt/freescout/
-- Docker Compose Config: /opt/freescout/docker-compose.yml
-- Dockerfile: /opt/freescout/Dockerfile
-- FreeScout Config: /opt/freescout/.env.freescout
-- Credentials: /opt/freescout/credentials.txt (mode 600, readable only by root)
-- Installation Log: /var/log/freescout-install-YYYYMMDD-HHMMSS.log
+## Common Commands
 
-## Docker Compose Commands
+All commands run from `/opt/freescout`:
 
-After installation, manage FreeScout from the /opt/freescout directory:
-
-View running containers and status:
 ```bash
-cd /opt/freescout
-docker compose ps
+docker compose ps              # container status
+docker compose logs -f         # follow all logs
+docker compose logs -f freescout   # app logs only
+docker compose logs -f db          # database logs only
+docker compose restart freescout   # restart app
+docker compose down            # stop containers
+docker compose up -d           # start containers
+docker compose down -v         # stop and DELETE all data
 ```
-
-View logs from all services:
-```bash
-docker compose logs -f
-```
-
-View logs from specific service (app or db):
-```bash
-docker compose logs -f freescout
-docker compose logs -f db
-```
-
-Stop all containers:
-```bash
-docker compose down
-```
-
-Start all containers:
-```bash
-docker compose up -d
-```
-
-Restart a specific service:
-```bash
-docker compose restart freescout
-```
-
-Stop and delete all data (WARNING: deletes database):
-```bash
-docker compose down -v
-```
-
-## Accessing FreeScout
-
-1. Open your web browser
-2. Navigate to the domain or IP you specified during installation
-3. Log in with the email and password you created
-4. Configure your mailboxes and helpdesk
 
 ## Credentials
 
-Credentials are saved to /opt/freescout/credentials.txt (readable only by root):
 ```bash
 sudo cat /opt/freescout/credentials.txt
 ```
 
-The file contains:
-- Installation URL
-- Admin email and password
-- Database connection details
-- Install directory path
-- FreeScout version
+## What the Installer Does
+
+The installer runs 8 phases automatically:
+
+1. **Pre-flight checks** -- verifies OS, internet, disk space (4 GB min), port 80
+2. **Version resolution** -- resolves the FreeScout release tag from the GitHub API
+3. **User prompts** -- asks for domain/IP, admin email, password, fresh vs. upgrade
+4. **Docker installation** -- installs Docker Engine + Compose plugin (skips if present)
+5. **File generation** -- creates Dockerfile, apache config, entrypoint, .env, docker-compose.yml
+6. **Image build** -- builds the PHP/Apache image with all FreeScout dependencies
+7. **Bootstrap** -- starts containers, runs migrations, creates admin user, clears caches
+8. **Health check** -- verifies FreeScout responds on HTTP
 
 ## Troubleshooting
 
-### Installation fails at pre-flight checks
+### Check the install log
 
-Check the installation log:
-```bash
-tail -f /var/log/freescout-install-*.log
-```
-
-Common issues:
-- Not running as root: Use sudo bash install-freescout-docker.sh
-- No internet connectivity: Check your network connection
-- Insufficient disk space: Free up at least 4GB
-- Port 80 already in use: Stop the conflicting service or modify docker-compose.yml
-
-### Docker build fails
-
-The build log is saved to the main installation log file:
 ```bash
 tail -100 /var/log/freescout-install-*.log
 ```
 
-If the build fails, you can retry it manually:
+### Docker build fails
+
+Retry manually with visible output:
+
 ```bash
 cd /opt/freescout
 docker compose build --progress=plain
 docker compose up -d
 ```
 
-### Application not responding after installation
+### App not responding
 
-Check container logs:
 ```bash
 cd /opt/freescout
 docker compose logs freescout
 docker compose logs db
 ```
 
-Common issues:
-- Database not ready: Wait 30-60 seconds and refresh your browser
-- Permission issues: Check file ownership with ls -la /opt/freescout/
-- Low memory: Docker containers may need more resources
+Common causes: database still starting (wait 30-60s), low memory, port conflict.
 
 ### Database connection issues
 
-Verify database health:
+Verify the database is healthy and accessible:
+
 ```bash
 cd /opt/freescout
-docker compose exec db mariadb -ufreescout -p -e "SELECT 1"
+docker compose ps                    # check health status
+docker inspect freescout-db | grep -A5 Health   # detailed health info
+docker compose exec db mariadb -ufreescout -p -e "SELECT 1" freescout
 ```
 
-When prompted for password, use the value from credentials.txt.
+When prompted for a password, use the value from `credentials.txt`.
 
 ### Reset admin password
 
-If you forget the admin password, reset it:
 ```bash
 cd /opt/freescout
 docker compose exec freescout php artisan freescout:update-user \
-  --email=your-admin-email@example.com \
-  --password=newpassword123
+  --email=your@email.com --password=newpassword123
 ```
 
-### Restart containers after system reboot
+### Containers not starting after reboot
 
-Containers are configured to restart automatically with restart: unless-stopped. To manually restart:
+Containers use `restart: unless-stopped`, so they should start automatically. If not:
+
 ```bash
 cd /opt/freescout
 docker compose up -d
 ```
 
-## Advanced Usage
+### CRLF line ending errors
 
-### Using Modules in Your Own Scripts
+If the script was edited on Windows, fix with:
 
-Each module can be sourced independently for reuse in other scripts:
-
-Example: Use only Docker setup
 ```bash
-#!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/lib/common.sh"
-source "${SCRIPT_DIR}/lib/docker-setup.sh"
-
-setup_logging
-require_root
-install_docker
-configure_docker_user
+sed -i 's/\r$//' install-freescout-docker.sh lib/*.sh
 ```
 
-Example: Use only preflight checks
+## HTTPS Setup
+
+The installer configures HTTP only. Add HTTPS with a reverse proxy:
+
+**Caddy** (recommended -- automatic certificates):
 ```bash
-#!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/lib/common.sh"
-source "${SCRIPT_DIR}/lib/config.sh"
-
-setup_logging
-check_os
-check_internet
-check_disk_space
-info "System check passed!"
-```
-
-### Custom Port Configuration
-
-To use a different port instead of 80:
-
-1. Edit docker-compose.yml:
-   ```yaml
-   freescout:
-     ports:
-       - "8080:80"  # Use port 8080 instead of 80
-   ```
-
-2. Restart containers:
-   ```bash
-   cd /opt/freescout
-   docker compose up -d
-   ```
-
-3. Access at http://your-ip:8080
-
-### HTTPS Setup with Reverse Proxy
-
-The installer configures HTTP only. For HTTPS, use a reverse proxy:
-
-Option 1: Caddy (recommended, automatic certificate renewal)
-```bash
-# Install Caddy on host
 apt-get install -y caddy
-
-# Configure /etc/caddy/Caddyfile
-example.com {
-    reverse_proxy 127.0.0.1:80
-}
-
-# Start Caddy
+# /etc/caddy/Caddyfile:
+# example.com {
+#     reverse_proxy 127.0.0.1:80
+# }
 systemctl restart caddy
 ```
 
-Option 2: nginx with Certbot
+**nginx + Certbot**:
 ```bash
 apt-get install -y nginx certbot python3-certbot-nginx
-# Follow Certbot instructions for your domain
+# Follow certbot prompts for your domain
 ```
 
-Option 3: Traefik (Docker-native)
-Modify docker-compose.yml to use Traefik labels and sidekick container.
+**Traefik** (Docker-native):
+Add Traefik labels and a Traefik service to `docker-compose.yml`. See the [Traefik docs](https://doc.traefik.io/traefik/).
 
-### Database Backups and Restore
-
-Automatic backup on fresh install is saved to:
+After setting up HTTPS, update `APP_URL` in `.env.freescout`:
 ```bash
-/opt/freescout/freescout-backup-YYYYMMDD-HHMMSS.sql
+# Change http:// to https://
+nano /opt/freescout/.env.freescout
+cd /opt/freescout && docker compose restart freescout
 ```
 
-Manual backup:
+## Backup & Restore
+
 ```bash
 cd /opt/freescout
+
+# Backup
 docker compose exec -T db mariadb-dump -ufreescout -p --all-databases > backup.sql
-```
 
-Manual restore:
-```bash
-cd /opt/freescout
+# Restore
 docker compose exec -T db mariadb -ufreescout -p < backup.sql
 ```
 
-### Scale Up Resources
+The installer also creates an automatic backup before a fresh install over an existing deployment.
 
-Edit docker-compose.yml to increase memory/CPU limits:
+## Custom Port
+
+To use a different port instead of 80, edit `docker-compose.yml`:
+
 ```yaml
 freescout:
-  mem_limit: 1g        # Increase from 512m
-  memswap_limit: 1g    # Increase from 512m
+  ports:
+    - "8080:80"   # access on port 8080
+```
+
+Then restart: `docker compose up -d`
+
+## Scaling Resources
+
+Edit `docker-compose.yml` to increase memory limits:
+
+```yaml
+freescout:
+  mem_limit: 1g          # default 512m
+  memswap_limit: 1g
 
 db:
-  mem_limit: 1g        # Increase from 512m
-  memswap_limit: 1g    # Increase from 512m
+  mem_limit: 1g          # default 512m
+  memswap_limit: 1g
 ```
 
-Then restart:
-```bash
-cd /opt/freescout
-docker compose up -d
-```
+Then restart: `docker compose up -d`
 
-## Module Architecture
+## Updating FreeScout
 
-See ARCHITECTURE.md for detailed information about the modular structure and how to extend or customize the installer.
-
-Quick overview:
-- lib/common.sh: Logging, progress tracking, curl helpers, system checks
-- lib/config.sh: Configuration, version resolution, preflight checks, user prompts
-- lib/docker-setup.sh: Docker installation and configuration
-- lib/deployment-files.sh: Generates all deployment files (Dockerfile, configs, etc.)
-- lib/bootstrap.sh: Container build, database setup, FreeScout initialization
-
-## Updating FreeScout Version
-
-To update to a newer FreeScout version:
-
-1. Check available versions at GitHub: https://github.com/freescout-helpdesk/freescout/releases
-2. Edit docker-compose.yml and update the FREESCOUT_VERSION argument
-3. Rebuild and restart:
+1. Check releases at https://github.com/freescout-helpdesk/freescout/releases
+2. Edit `docker-compose.yml` and update `FREESCOUT_VERSION`
+3. Rebuild:
    ```bash
    cd /opt/freescout
    docker compose down
@@ -399,80 +226,44 @@ To update to a newer FreeScout version:
    docker compose up -d
    ```
 
-## Uninstalling FreeScout
+## Uninstalling
 
-To completely remove FreeScout and all data:
-
+Remove everything (containers, volumes, files):
 ```bash
 cd /opt/freescout
-docker compose down -v          # Stop containers and delete volumes
+docker compose down -v              # stop and delete volumes
 cd /
-sudo rm -rf /opt/freescout      # Remove installation directory
-sudo rm -f /etc/apt/sources.list.d/docker.list  # Optional: remove Docker repo
+sudo rm -rf /opt/freescout          # remove files
 ```
 
-To keep the database but remove containers:
-
+Keep the database but remove containers:
 ```bash
 cd /opt/freescout
-docker compose down              # Stop and remove containers only
-                                 # Volumes (database) are preserved
+docker compose down                 # volumes are preserved
 ```
 
-## Security Considerations
+## Security Notes
 
-- Credentials file is created with mode 600 (readable only by root)
-- Database passwords are randomly generated using openssl
-- Admin password is entered interactively (not stored in any file)
-- Consider placing a reverse proxy with SSL/TLS in front of FreeScout
-- Regularly update Docker images: docker pull and rebuild
-- Keep your Ubuntu system updated: apt-get update && apt-get upgrade
-- Monitor disk space for database growth
-- Review Docker logs periodically for errors
+- Credentials file is created with mode `600` (root-only readable)
+- Database passwords are generated with `openssl rand`
+- Admin password is entered interactively, never stored in scripts
+- HTTPS is strongly recommended for production -- see [HTTPS Setup](#https-setup)
+- Keep your system and Docker images updated regularly
 
-## Performance Tuning
+## Project Structure
 
-Default configuration is suitable for small to medium deployments.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for module details.
 
-For larger installations:
-- Increase PHP memory_limit in Dockerfile
-- Increase MariaDB memory allocation
-- Use separate Docker network bridges for isolation
-- Consider using persistent volumes for storage
-- Implement caching layers (Redis) if available
-
-See docker-compose.yml comments for additional tuning options.
-
-## Support
-
-For issues with:
-- FreeScout: Visit https://github.com/freescout-helpdesk/freescout
-- Docker: Visit https://docs.docker.com/
-- This installer: Check the installation log and ARCHITECTURE.md
+```
+install-freescout-docker.sh      # entry point
+lib/
+  common.sh                      # logging, progress, curl helpers
+  config.sh                      # configuration, preflight checks, prompts
+  docker-setup.sh                # Docker installation
+  deployment-files.sh            # generates Dockerfile, configs, docker-compose
+  bootstrap.sh                   # container build, DB setup, app init
+```
 
 ## License
 
-This installer script is provided as-is for deploying the FreeScout helpdesk application on Ubuntu servers.
-
-FreeScout itself is licensed under AGPL-3.0. See https://github.com/freescout-helpdesk/freescout for details.
-
-## Changelog
-
-### v3.0.0
-- Refactored monolithic script into 5 focused modules
-- Improved error handling and logging throughout
-- Fixed PHP variable escaping in Dockerfile classmap sanitization
-- Added comprehensive documentation
-- Better separation of concerns for maintainability
-
-### v2.x
-- Previous versions - see git history
-
-## Contributing
-
-To contribute improvements:
-1. Test changes thoroughly on a fresh Ubuntu 24.04 system
-2. Maintain the modular structure
-3. Update ARCHITECTURE.md if adding new modules
-4. Test both fresh installs and upgrades
-5. Document any new functions and their parameters
+This installer is provided as-is. FreeScout itself is [AGPL-3.0](https://github.com/freescout-helpdesk/freescout).
