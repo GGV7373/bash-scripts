@@ -42,12 +42,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # PHP extensions (including imap for email fetching) & Composer
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-configure imap --with-kerberos --with-imap-ssl \
-    && docker-php-ext-install -j "$(nproc)" \
+    && docker-php-ext-install -j "\$(nproc)" \
        bcmath exif gd imap mbstring opcache pdo_mysql xml zip \
-    && EXPECTED_CHECKSUM="$(curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://composer.github.io/installer.sig)" \
+    && EXPECTED_CHECKSUM="\$(curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://composer.github.io/installer.sig)" \
     && curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://getcomposer.org/installer -o /tmp/composer-setup.php \
-    && ACTUAL_CHECKSUM="$(sha384sum /tmp/composer-setup.php | cut -d ' ' -f 1)" \
-    && [ "${EXPECTED_CHECKSUM}" = "${ACTUAL_CHECKSUM}" ] \
+    && ACTUAL_CHECKSUM="\$(sha384sum /tmp/composer-setup.php | cut -d ' ' -f 1)" \
+    && [ "\${EXPECTED_CHECKSUM}" = "\${ACTUAL_CHECKSUM}" ] \
     && php /tmp/composer-setup.php --install-dir=/usr/bin --filename=composer \
     && rm -f /tmp/composer-setup.php
 
@@ -243,7 +243,7 @@ services:
     volumes:
       - freescout-db:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "bash", "-c", "mariadb -ufreescout -p\"\$MYSQL_PASSWORD\" -e 'SELECT 1' freescout"]
+      test: ["CMD", "bash", "-c", "mariadb -ufreescout -p\$\$MYSQL_PASSWORD -e 'SELECT 1' freescout"]
       interval: 10s
       timeout: 5s
       retries: 15

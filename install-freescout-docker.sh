@@ -30,15 +30,6 @@ if od -An -tx1 -N 200 "$0" 2>/dev/null | tr -d ' \n' | grep -q '0d0a'; then
 fi
 
 # Source library modules
-check_line_endings() {
-    if od -An -tx1 -N 200 "$0" 2>/dev/null | tr -d ' \n' | grep -q '0d0a'; then
-        echo "ERROR: This script has Windows (CRLF) line endings." >&2
-        echo "Fix with:  sed -i 's/\r\$//' $0" >&2
-        exit 1
-    fi
-}
-
-# Source library modules
 source "${SCRIPT_DIR}/lib/common.sh" || { echo "ERROR: Cannot load lib/common.sh" >&2; exit 1; }
 source "${SCRIPT_DIR}/lib/config.sh" || { echo "ERROR: Cannot load lib/config.sh" >&2; exit 1; }
 source "${SCRIPT_DIR}/lib/docker-setup.sh" || { echo "ERROR: Cannot load lib/docker-setup.sh" >&2; exit 1; }
