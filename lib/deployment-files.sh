@@ -25,7 +25,7 @@ backup_existing_db() {
 }
 
 generate_dockerfile() {
-    cat > Dockerfile <<DOCKERFILE
+    cat > Dockerfile <<'DOCKERFILE'
 FROM php:${PHP_VERSION}-apache-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -143,10 +143,18 @@ chown -R www-data:www-data /var/www/freescout/bootstrap/cache
 chmod -R 775 /var/www/freescout/bootstrap/cache
 
 # Wait for database connectivity before starting background services
+if [ ! -f /var/www/freescout/.env ]; then
+    echo "ERROR: .env file not found at /var/www/freescout/.env"
+    exit 1
+fi
 DB_PASSWORD=$(grep '^DB_PASSWORD=' /var/www/freescout/.env | cut -d= -f2)
+if [ -z "$DB_PASSWORD" ]; then
+    echo "ERROR: DB_PASSWORD not found in .env file"
+    exit 1
+fi
 echo "Waiting for database connection..."
 for i in $(seq 1 60); do
-    if php -r "new PDO('mysql:host=db;port=3306;dbname=freescout', 'freescout', '$DB_PASSWORD');" 2>/dev/null; then
+    if DB_PASSWORD="$DB_PASSWORD" php -r 'new PDO("mysql:host=db;port=3306;dbname=freescout", "freescout", getenv("DB_PASSWORD"));' 2>/dev/null; then
         echo "Database connection established."
         break
     fi
@@ -235,7 +243,7 @@ services:
     volumes:
       - freescout-db:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mariadb", "-ufreescout", "-p${DB_PASSWORD}", "-e", "SELECT 1", "freescout"]
+      test: ["CMD", "bash", "-c", "mariadb -ufreescout -p\"$MYSQL_PASSWORD\" -e 'SELECT 1' freescout"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -259,6 +267,14 @@ EOF
 generate_all_files() {
     show_progress "Generating deployment files"
     info "Setting up FreeScout under ${INSTALL_DIR} …"
+
+    # Validate required variables
+    local required_vars=(FREESCOUT_DOMAIN PHP_VERSION FREESCOUT_VERSION DB_ROOT_PASSWORD DB_PASSWORD)
+    for var in "${required_vars[@]}"; do
+        if [[ -z "${!var}" ]]; then
+            die "Required variable '$var' is not set. Cannot generate deployment files."
+        fi
+    done
 
     mkdir -p "${INSTALL_DIR}"
     cd "${INSTALL_DIR}"
