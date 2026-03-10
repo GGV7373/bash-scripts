@@ -136,22 +136,21 @@ get_user_config() {
 
     # Database passwords
     DB_ROOT_PASSWORD=""
-    DB_PASSWORD=""
     if [[ -f "${INSTALL_DIR}/credentials.txt" ]]; then
         DB_ROOT_PASSWORD=$(sed -n 's/^DB Root Password:[[:space:]]*//p' "${INSTALL_DIR}/credentials.txt" | head -n1)
-        DB_PASSWORD=$(sed -n 's/^Database Password:[[:space:]]*//p' "${INSTALL_DIR}/credentials.txt" | head -n1)
-        if [[ -n "${DB_ROOT_PASSWORD}" && -n "${DB_PASSWORD}" ]]; then
-            info "Reusing existing database credentials from ${INSTALL_DIR}/credentials.txt"
+        if [[ -n "${DB_ROOT_PASSWORD}" ]]; then
+            info "Reusing existing DB root password from ${INSTALL_DIR}/credentials.txt"
         else
             DB_ROOT_PASSWORD=""
-            DB_PASSWORD=""
         fi
     fi
 
-    if [[ -z "${DB_ROOT_PASSWORD}" || -z "${DB_PASSWORD}" ]]; then
+    if [[ -z "${DB_ROOT_PASSWORD}" ]]; then
         DB_ROOT_PASSWORD=$(openssl rand -hex 16)
-        DB_PASSWORD=$(openssl rand -hex 16)
     fi
+
+    # Database user password is the same as admin password
+    DB_PASSWORD="${ADMIN_PASSWORD}"
 
     echo ""
     info "Configuration:"

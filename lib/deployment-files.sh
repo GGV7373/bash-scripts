@@ -243,7 +243,7 @@ services:
     volumes:
       - freescout-db:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "bash", "-c", "mariadb -ufreescout -p\"$MYSQL_PASSWORD\" -e 'SELECT 1' freescout"]
+      test: ["CMD", "bash", "-c", "mariadb -ufreescout -p\"\\$MYSQL_PASSWORD\" -e 'SELECT 1' freescout"]
       interval: 10s
       timeout: 5s
       retries: 15
