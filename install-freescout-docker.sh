@@ -605,6 +605,16 @@ show_progress "Building and starting containers"
 info "Building Docker image (this may take a few minutes) …"
 run_quiet "Docker image build" docker compose build --progress=plain
 
+# ── Debugging Enhancements ─────────────────────────────────────────────────
+# Add detailed logging for Docker build errors
+if ! docker build -t freescout .; then
+    err "Docker build failed. Capturing detailed logs."
+    docker build -t freescout . > "${LOG_FILE}" 2>&1 || true
+    tail -n 40 "${LOG_FILE}" >&2 || true
+    die "Docker build failed. See ${LOG_FILE} for details."
+fi
+info "Docker build completed successfully."
+
 info "Starting containers …"
 run_quiet "Start containers" docker compose up -d
 
