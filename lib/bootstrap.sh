@@ -6,7 +6,7 @@
 build_and_start_containers() {
     show_progress "Building and starting containers"
     info "Building Docker image (this may take a few minutes) …"
-    run_quiet "Docker image build" docker compose build --progress=plain
+    run_quiet "Docker image build" docker compose --progress=plain build
 
     info "Starting containers …"
     run_quiet "Start containers" docker compose up -d

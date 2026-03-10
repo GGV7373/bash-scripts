@@ -26,7 +26,7 @@ backup_existing_db() {
 
 generate_dockerfile() {
     cat > Dockerfile <<DOCKERFILE
-FROM php:\${PHP_VERSION}-apache-bookworm
+FROM php:${PHP_VERSION}-apache-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -42,12 +42,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
 # PHP extensions (including imap for email fetching) & Composer
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \\
     && docker-php-ext-configure imap --with-kerberos --with-imap-ssl \\
-    && docker-php-ext-install -j "\$(nproc)" \\
+    && docker-php-ext-install -j "$(nproc)" \\
        bcmath exif gd imap mbstring opcache pdo_mysql xml zip \\
-    && EXPECTED_CHECKSUM="\$(curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://composer.github.io/installer.sig)" \\
+    && EXPECTED_CHECKSUM="$(curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://composer.github.io/installer.sig)" \\
     && curl -fsSL --connect-timeout 15 --max-time 120 --retry 5 --retry-delay 2 --retry-all-errors https://getcomposer.org/installer -o /tmp/composer-setup.php \\
-    && ACTUAL_CHECKSUM="\$(sha384sum /tmp/composer-setup.php | cut -d ' ' -f 1)" \\
-    && [ "\${EXPECTED_CHECKSUM}" = "\${ACTUAL_CHECKSUM}" ] \\
+    && ACTUAL_CHECKSUM="$(sha384sum /tmp/composer-setup.php | cut -d ' ' -f 1)" \\
+    && [ "${EXPECTED_CHECKSUM}" = "${ACTUAL_CHECKSUM}" ] \\
     && php /tmp/composer-setup.php --install-dir=/usr/bin --filename=composer \\
     && rm -f /tmp/composer-setup.php
 
@@ -55,9 +55,9 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \\
 RUN a2enmod rewrite headers
 
 # Clone FreeScout (pinned version, with retry logic)
-ARG FREESCOUT_VERSION=\${FREESCOUT_VERSION}
+ARG FREESCOUT_VERSION=${FREESCOUT_VERSION}
 RUN for attempt in 1 2 3; do \\
-        git clone --depth 1 --branch "\${FREESCOUT_VERSION}" \\
+        git clone --depth 1 --branch "${FREESCOUT_VERSION}" \\
             -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \\
             https://github.com/freescout-helpdesk/freescout.git /var/www/freescout \\
         && break || { \\
