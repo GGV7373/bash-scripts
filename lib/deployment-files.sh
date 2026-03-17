@@ -212,13 +212,13 @@ EOF
 }
 
 generate_docker_compose() {
-    cat > docker-compose.yml <<EOF
+    cat > docker-compose.yml <<'EOF'
 services:
   freescout:
     build:
       context: .
       args:
-        FREESCOUT_VERSION: "${FREESCOUT_VERSION}"
+        FREESCOUT_VERSION: "__FREESCOUT_VERSION__"
     container_name: freescout-app
     ports:
       - "80:80"
@@ -244,10 +244,10 @@ services:
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
     environment:
-      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
+      MYSQL_ROOT_PASSWORD: "__DB_ROOT_PASSWORD__"
       MYSQL_DATABASE: "freescout"
       MYSQL_USER: "freescout"
-      MYSQL_PASSWORD: "${DB_PASSWORD}"
+      MYSQL_PASSWORD: "__DB_PASSWORD__"
     volumes:
       - freescout-db:/var/lib/mysql
     healthcheck:
@@ -270,6 +270,10 @@ volumes:
   freescout-db:
   freescout-storage:
 EOF
+    # Substitute the actual values
+    sed -i "s|__FREESCOUT_VERSION__|${FREESCOUT_VERSION}|g" docker-compose.yml
+    sed -i "s|__DB_ROOT_PASSWORD__|${DB_ROOT_PASSWORD}|g" docker-compose.yml
+    sed -i "s|__DB_PASSWORD__|${DB_PASSWORD}|g" docker-compose.yml
 }
 
 generate_all_files() {
