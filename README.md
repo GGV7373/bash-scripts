@@ -266,4 +266,4 @@ lib/
 
 ## License
 
-This installer is provided as-is. FreeScout itself is [AGPL-3.0](https://github.com/freescout-helpdesk/freescout).
+This installer is under MIT. FreeScout itself is [AGPL-3.0](https://github.com/freescout-helpdesk/freescout).

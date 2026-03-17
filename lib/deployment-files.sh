@@ -59,15 +59,15 @@ ARG FREESCOUT_VERSION=${FREESCOUT_VERSION}
 RUN for attempt in 1 2 3; do \
         git clone --depth 1 --branch "${FREESCOUT_VERSION}" \
             -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
-            https://github.com/freescout-helpdesk/freescout.git /var/www/freescout \
+            https://github.com/freescout-helpdesk/freescout.git "${TARGET_DIR}" \
         && break || { \
-            echo "Git clone attempt \${attempt} failed, retrying in 10s..."; \
-            rm -rf /var/www/freescout; \
+            echo "Git clone attempt ${attempt} failed, retrying in 10s..."; \
+            rm -rf "${TARGET_DIR}"; \
             sleep 10; \
         }; \
-    done && [ -d /var/www/freescout ]
+    done && [ -d "${TARGET_DIR}" ]
 
-WORKDIR /var/www/freescout
+WORKDIR "${TARGET_DIR}"
 
 # Install PHP dependencies
 RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \
@@ -278,8 +278,8 @@ generate_all_files() {
         fi
     done
 
-    mkdir -p "${INSTALL_DIR}"
-    cd "${INSTALL_DIR}"
+    mkdir -p "${TARGET_DIR}"
+    cd "${TARGET_DIR}"
 
     backup_existing_db
     generate_dockerfile

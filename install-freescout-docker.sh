@@ -36,6 +36,12 @@ source "${SCRIPT_DIR}/lib/docker-setup.sh" || { echo "ERROR: Cannot load lib/doc
 source "${SCRIPT_DIR}/lib/deployment-files.sh" || { echo "ERROR: Cannot load lib/deployment-files.sh" >&2; exit 1; }
 source "${SCRIPT_DIR}/lib/bootstrap.sh" || { echo "ERROR: Cannot load lib/bootstrap.sh" >&2; exit 1; }
 
+# Add a variable for the installation directory
+INSTALL_DIR="/opt/freescout"
+
+# Pass the installation directory to the deployment script
+export TARGET_DIR="${INSTALL_DIR}"
+
 # Setup logging
 export DEBIAN_FRONTEND=noninteractive
 setup_logging
