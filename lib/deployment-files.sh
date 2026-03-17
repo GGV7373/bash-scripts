@@ -209,7 +209,10 @@ EOF
 }
 
 generate_docker_compose() {
-    cat > docker-compose.yml <<EOF
+    # Use a temp file for safe password substitution
+    local temp_compose=$(mktemp)
+
+    cat > "$temp_compose" <<EOF
 services:
   freescout:
     build:
@@ -248,7 +251,7 @@ services:
     volumes:
       - freescout-db:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "bash", "-c", "mariadb -ufreescout -p\\$MYSQL_PASSWORD -e 'SELECT 1' freescout"]
+      test: ["CMD", "mariadb", "-ufreescout", "-p__DB_PASSWORD__", "-e", "SELECT 1", "freescout"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -267,10 +270,13 @@ volumes:
   freescout-db:
   freescout-storage:
 EOF
-    # Substitute the actual values
-    sed -i "s|__FREESCOUT_VERSION__|${FREESCOUT_VERSION}|g" docker-compose.yml
-    sed -i "s|__DB_ROOT_PASSWORD__|${DB_ROOT_PASSWORD}|g" docker-compose.yml
-    sed -i "s|__DB_PASSWORD__|${DB_PASSWORD}|g" docker-compose.yml
+
+    # Substitute values safely using env substitution instead of sed
+    sed -e "s|__FREESCOUT_VERSION__|${FREESCOUT_VERSION}|g" \
+        -e "s|__DB_ROOT_PASSWORD__|${DB_ROOT_PASSWORD//&/\\&}|g" \
+        -e "s|__DB_PASSWORD__|${DB_PASSWORD//&/\\&}|g" \
+        "$temp_compose" > docker-compose.yml
+    rm -f "$temp_compose"
 }
 
 generate_all_files() {
