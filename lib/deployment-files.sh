@@ -80,7 +80,7 @@ RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \
 # Install Node.js dependencies and compile assets (JS/CSS)
 RUN rm -rf node_modules package-lock.json \
     && npm cache clean --force \
-    && npm install cross-env@5.2.1 laravel-mix@4.1.4 resolve-url-loader@3.1.2 sass@1.32.13 sass-loader@8.0.2 \
+    && npm install cross-env@5.2.1 laravel-mix@4.1.4 resolve-url-loader@3.1.2 sass@1.32.13 sass-loader@8.0.2 vue@2.6.14 axios@0.21.4 \
     && npm run production \
     && rm -rf node_modules
 
