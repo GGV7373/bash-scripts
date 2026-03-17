@@ -209,7 +209,7 @@ EOF
 }
 
 generate_docker_compose() {
-    cat > docker-compose.yml <<'EOF'
+    cat > docker-compose.yml <<EOF
 services:
   freescout:
     build:
@@ -223,8 +223,8 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./.env.freescout:/var/www/freescout/.env
-      - freescout-storage:/var/www/freescout/storage
+      - ./.env.freescout:${TARGET_DIR}/.env
+      - freescout-storage:${TARGET_DIR}/storage
     mem_limit: 512m
     memswap_limit: 512m
     logging:
