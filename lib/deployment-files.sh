@@ -88,8 +88,8 @@ RUN php -r '\$todo=[];\$ij="vendor/composer/installed.json";if(file_exists(\$ij)
 RUN COMPOSER_ALLOW_SUPERUSER=1 php artisan package:discover --ansi 2>&1 || true
 
 # Set ownership and permissions
-RUN chown -R www-data:www-data /var/www/freescout \
-    && chmod -R u=rwX,g=rX,o=rX /var/www/freescout
+RUN chown -R www-data:www-data ${TARGET_DIR} \
+    && chmod -R u=rwX,g=rX,o=rX ${TARGET_DIR}
 
 # Apache vhost
 COPY freescout.conf /etc/apache2/sites-available/000-default.conf
@@ -118,63 +118,63 @@ DOCKERFILE
 }
 
 generate_apache_config() {
-    cat > freescout.conf <<'APACHECONF'
+    cat > freescout.conf <<APACHECONF
 <VirtualHost *:80>
-    DocumentRoot /var/www/freescout/public
+    DocumentRoot ${TARGET_DIR}/public
 
-    <Directory /var/www/freescout/public>
+    <Directory ${TARGET_DIR}/public>
         Options -Indexes +FollowSymLinks
         AllowOverride All
         Require all granted
     </Directory>
 
-    ErrorLog ${APACHE_LOG_DIR}/freescout-error.log
-    CustomLog ${APACHE_LOG_DIR}/freescout-access.log combined
+    ErrorLog \${APACHE_LOG_DIR}/freescout-error.log
+    CustomLog \${APACHE_LOG_DIR}/freescout-access.log combined
 </VirtualHost>
 APACHECONF
 }
 
 generate_entrypoint() {
-    cat > entrypoint.sh <<'ENTRYPOINT'
+    cat > entrypoint.sh <<ENTRYPOINT
 #!/usr/bin/env bash
 set -euo pipefail
 
 # Fix storage permissions on every start
-chown -R www-data:www-data /var/www/freescout/storage
-chmod -R 775 /var/www/freescout/storage
+chown -R www-data:www-data ${TARGET_DIR}/storage
+chmod -R 775 ${TARGET_DIR}/storage
 
 # Ensure bootstrap/cache is writable
-chown -R www-data:www-data /var/www/freescout/bootstrap/cache
-chmod -R 775 /var/www/freescout/bootstrap/cache
+chown -R www-data:www-data ${TARGET_DIR}/bootstrap/cache
+chmod -R 775 ${TARGET_DIR}/bootstrap/cache
 
 # Wait for database connectivity before starting background services
-if [ ! -f /var/www/freescout/.env ]; then
-    echo "ERROR: .env file not found at /var/www/freescout/.env"
+if [ ! -f ${TARGET_DIR}/.env ]; then
+    echo "ERROR: .env file not found at ${TARGET_DIR}/.env"
     exit 1
 fi
-DB_PASSWORD=$(grep '^DB_PASSWORD=' /var/www/freescout/.env | cut -d= -f2 || echo "")
-if [ -z "$DB_PASSWORD" ]; then
+DB_PASSWORD=\$(grep '^DB_PASSWORD=' ${TARGET_DIR}/.env | cut -d= -f2 || echo "")
+if [ -z "\$DB_PASSWORD" ]; then
     echo "ERROR: DB_PASSWORD not found in .env file"
     exit 1
 fi
 echo "Waiting for database connection..."
-for i in $(seq 1 60); do
-    if DB_PASSWORD="$DB_PASSWORD" php -r 'new PDO("mysql:host=db;port=3306;dbname=freescout", "freescout", getenv("DB_PASSWORD"));' 2>/dev/null; then
+for i in \$(seq 1 60); do
+    if DB_PASSWORD="\$DB_PASSWORD" php -r 'new PDO("mysql:host=db;port=3306;dbname=freescout", "freescout", getenv("DB_PASSWORD"));' 2>/dev/null; then
         echo "Database connection established."
         break
     fi
-    if [ "$i" -eq 60 ]; then
+    if [ "\$i" -eq 60 ]; then
         echo "WARNING: Could not connect to database after 60 attempts. Starting anyway..."
     fi
     sleep 2
 done
 
 # Re-run package:discover at runtime
-cd /var/www/freescout
+cd ${TARGET_DIR}
 php artisan package:discover 2>/dev/null || true
 
 # Laravel scheduler cron (runs every minute)
-echo "* * * * * www-data cd /var/www/freescout && php artisan schedule:run >> /dev/null 2>&1" \
+echo "* * * * * www-data cd ${TARGET_DIR} && php artisan schedule:run >> /dev/null 2>&1" \\
     > /etc/cron.d/freescout-scheduler
 echo "" >> /etc/cron.d/freescout-scheduler
 chmod 0644 /etc/cron.d/freescout-scheduler
@@ -184,11 +184,11 @@ crontab -u www-data /dev/null 2>/dev/null || true
 /usr/sbin/cron
 
 # Queue worker for email processing (background)
-su -s /bin/bash www-data -c \
-    "cd /var/www/freescout && php artisan queue:work --sleep=3 --tries=3 --timeout=60 --daemon" &
-echo "Queue worker started (PID: $!)"
+su -s /bin/bash www-data -c \\
+    "cd ${TARGET_DIR} && php artisan queue:work --sleep=3 --tries=3 --timeout=60 --daemon" &
+echo "Queue worker started (PID: \$!)"
 
-exec "$@"
+exec "\$@"
 ENTRYPOINT
 }
 
