@@ -25,7 +25,7 @@ backup_existing_db() {
 }
 
 generate_dockerfile() {
-    cat > Dockerfile <<'DOCKERFILE'
+    cat > Dockerfile <<DOCKERFILE
 FROM php:${PHP_VERSION}-apache-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -62,7 +62,7 @@ RUN for attempt in 1 2 3; do \
             -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
             https://github.com/freescout-helpdesk/freescout.git "${TARGET_DIR}" \
         && break || { \
-            echo "Git clone attempt ${attempt} failed, retrying in 10s..."; \
+            echo "Git clone attempt \${attempt} failed, retrying in 10s..."; \
             rm -rf "${TARGET_DIR}"; \
             sleep 10; \
         }; \
