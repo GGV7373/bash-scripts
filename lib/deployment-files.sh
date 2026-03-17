@@ -78,7 +78,8 @@ RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \
     && composer clear-cache
 
 # Install Node.js dependencies and compile assets (JS/CSS)
-RUN npm install \
+RUN rm -rf node_modules package-lock.json \
+    && npm install --legacy-peer-deps \
     && npm run production \
     && rm -rf node_modules
 
