@@ -80,7 +80,7 @@ RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \
 # Install Node.js dependencies and compile assets (JS/CSS)
 RUN rm -rf node_modules package-lock.json \
     && npm cache clean --force \
-    && npm install \
+    && npm install --include=dev \
     && npm run production \
     && rm -rf node_modules
 
