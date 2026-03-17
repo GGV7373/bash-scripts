@@ -25,7 +25,7 @@ backup_existing_db() {
 }
 
 generate_dockerfile() {
-    cat > Dockerfile <<DOCKERFILE
+    cat > Dockerfile <<'DOCKERFILE'
 FROM php:${PHP_VERSION}-apache-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurl4-openssl-dev \
     libc-client-dev libkrb5-dev \
     cron git unzip \
+    nodejs npm \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # PHP extensions (including imap for email fetching) & Composer
@@ -75,6 +76,11 @@ RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \
         --prefer-dist --no-scripts --no-autoloader \
         --ignore-platform-req=php \
     && composer clear-cache
+
+# Install Node.js dependencies and compile assets (JS/CSS)
+RUN npm install --prefer-offline --no-audit \
+    && npm run production \
+    && npm cache clean --force
 
 # Fix missing classmap paths (case-mismatch symlinks or empty placeholders)
 # Composer 2 reads autoload entries from installed.json, so we fix the
