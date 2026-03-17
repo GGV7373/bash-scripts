@@ -110,7 +110,7 @@ check_final_health() {
     info "Verifying FreeScout is accessible …"
     sleep 5
     local http_code
-    http_code=$(curl -fsSL -o /dev/null -w "%{http_code}" "http://127.0.0.1" 2>/dev/null || echo "000")
+    http_code=$(curl -fsSL -o /dev/null -w "%{http_code}" "http://${FREESCOUT_DOMAIN}" 2>/dev/null || echo "000")
     if [[ "${http_code}" =~ ^(200|302|301)$ ]]; then
         info "FreeScout is responding (HTTP ${http_code})."
     else

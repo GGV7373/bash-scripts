@@ -78,9 +78,9 @@ RUN COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1 \
     && composer clear-cache
 
 # Install Node.js dependencies and compile assets (JS/CSS)
-RUN npm install --prefer-offline --no-audit \
+RUN npm install \
     && npm run production \
-    && npm cache clean --force
+    && rm -rf node_modules
 
 # Fix missing classmap paths (case-mismatch symlinks or empty placeholders)
 # Composer 2 reads autoload entries from installed.json, so we fix the
@@ -155,7 +155,7 @@ if [ ! -f /var/www/freescout/.env ]; then
     echo "ERROR: .env file not found at /var/www/freescout/.env"
     exit 1
 fi
-DB_PASSWORD=$(grep '^DB_PASSWORD=' /var/www/freescout/.env | cut -d= -f2)
+DB_PASSWORD=$(grep '^DB_PASSWORD=' /var/www/freescout/.env | cut -d= -f2 || echo "")
 if [ -z "$DB_PASSWORD" ]; then
     echo "ERROR: DB_PASSWORD not found in .env file"
     exit 1
@@ -251,7 +251,7 @@ services:
     volumes:
       - freescout-db:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "bash", "-c", "mariadb -ufreescout -p\$\$MYSQL_PASSWORD -e 'SELECT 1' freescout"]
+      test: ["CMD", "bash", "-c", "mariadb -ufreescout -p\"${MYSQL_PASSWORD}\" -e 'SELECT 1' freescout"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -297,4 +297,4 @@ generate_all_files() {
     info "All deployment files generated."
 }
 
-export -f generate_all_files backup_existing_db
+export -f generate_all_files backup_existing_db generate_dockerfile generate_apache_config generate_entrypoint generate_env_file generate_docker_compose
